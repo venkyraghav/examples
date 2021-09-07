@@ -1,0 +1,44 @@
+kafka:
+  bootstrap-servers: localhost:9092
+  schema.registry.url: http://localhost:8081
+  client-id: ${spring.application.name}
+
+spring:
+  application:
+    name: "fincard"
+    version: 0.0.1
+  kafka:
+    bootstrap-servers: ${kafka.bootstrap-servers}
+    properties:
+      request.timeout.ms: 20000
+      retry.backoff.ms: 500
+      schema.registry.url: ${kafka.schema.registry.url}
+    client-id: ${kafka.client-id}
+    streams:
+      state-dir: /tmp
+      bootstrap-servers: ${kafka.bootstrap-servers}
+      group-id: ${kafka.client-id}-streams
+      application-id: ${kafka.client-id}-${spring.application.version}
+      auto-offset-reset: earliest
+      schema.registry.url: ${kafka.schema.registry.url}
+      properties:
+        default.key.serde: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde
+        default.value.serde: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde
+    consumer:
+      group-id: ${kafka.client-id}-consumer
+      client-id: ${kafka.client-id}
+      application-id: ${kafka.client-id}-${spring.application.version}
+      auto-offset-reset: earliest
+      key-deserializer: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerializer
+      value-deserializer: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerializer
+    producer:
+      client-id: ${kafka.client-id}
+      application-id: ${spring.application.name}-${spring.application.version}
+      key-serializer: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerializer
+      value-serializer: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerializer
+    template:
+      default-topic:
+
+logging:
+  level:
+    root: info
