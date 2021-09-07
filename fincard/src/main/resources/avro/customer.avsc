@@ -4,12 +4,12 @@
     "name": "Customer",
     "namespace": "io.confluent.examples.fincard",
     "fields": [
-        { "name": "id", "type": "int", "arg.properties": {"iteration": { "start": 1, "step": 10}}},
-        { "name": "name", "type": "string", "arg.properties": {"regex": "FirstName_[0-9][0-9][0-9] LastName_[0-9][0-9][0-9]"}},
-        { "name": "zipcode", "type": "string", "arg.properties": {"regex": "30[0-9][0-9][0-9]"}},
-        { "name": "cvv", "type": "string", "arg.properties": {"regex": "[0-9][0-9][0-9]"}},
-        { "name": "cardnumber", "type": "string", "arg.properties": {"regex": "410081699900[0-9][0-9][0-9][0-9]"}},
-        { "name": "expdate", "type": "string", "arg.properties": {"regex": "[1-9]/20[0-9][0-9]"}},
-        { "name": "pin", "type": "string", "arg.properties": {"regex": "[0-9][0-9][0-9][0-9]"}}
+        { "name": "id", "type": {"type": "long", "arg.properties": {"iteration": { "start": 1, "step": 10}}}},
+        { "name": "name", "type": {"type": "string", "arg.properties": {"regex": "FirstName_[0-9][0-9][0-9] LastName_[0-9][0-9][0-9]"}}},
+        { "name": "zipcode", "type": {"type": "string", "arg.properties": {"regex": "30[0-9][0-9][0-9]"}}},
+        { "name": "cvv", "type": {"type": "string", "arg.properties": {"regex": "[0-9][0-9][0-9]"}}},
+        { "name": "cardnumber", "type": {"type": "string", "arg.properties": {"regex": "410081699900[0-9][0-9][0-9][0-9]"}}},
+        { "name": "expdate", "type": {"type": "string", "arg.properties": {"regex": "[1-9]/20[0-9][0-9]"}}},
+        { "name": "pin", "type": {"type": "string", "arg.properties": {"regex": "[0-9][0-9][0-9][0-9]"}}}
     ]
 }
