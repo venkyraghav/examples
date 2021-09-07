@@ -16,6 +16,6 @@
         { "name": "deviceid", "type": {"type": "long", "arg.properties": {"iteration": { "start": 1, "step": 200}}}},
         { "name": "datetime", "type": {"type": "string"}},
         { "name": "location", "type": {"type": "string", "arg.properties": {"regex": "30[0-9][0-9][0-9]"}}},
-        { "name": "nuance", "type": {"type": "long", "arg.properties": {"iteration": { "start": 1, "step": 1}}}}
+        { "name": "nonce", "type": {"type": "long", "arg.properties": {"iteration": { "start": 1, "step": 1}}}}
     ]
 }

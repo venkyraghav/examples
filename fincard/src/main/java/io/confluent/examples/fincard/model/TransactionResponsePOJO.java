@@ -81,12 +81,12 @@ public class TransactionResponsePOJO {
         this.datetime = datetime;
     }
 
-    public long getNuance() {
-        return nuance;
+    public long getNonce() {
+        return nonce;
     }
 
-    public void setNuance(long nuance) {
-        this.nuance = nuance;
+    public void setNonce(long nonce) {
+        this.nonce = nonce;
     }
 
     public double getCreditlimit() {
@@ -115,7 +115,7 @@ public class TransactionResponsePOJO {
     private String status;
     private String reason;
     private String datetime;
-    private long nuance;
+    private long nonce;
     private double creditlimit;
     private String creditlimitcurrency;
 }

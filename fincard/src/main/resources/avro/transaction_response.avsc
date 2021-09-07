@@ -14,7 +14,7 @@
         { "name": "status", "type": {"type": "string", "arg.properties": {"regex": "[APPROVED,DENIED,OK,FAILED]"}}},
         { "name": "reason", "type": {"type": "string", "arg.properties": {"regex": "No reason"}}},
         { "name": "datetime", "type": {"type": "string"}},
-        { "name": "nuance", "type": {"type": "long", "arg.properties": {"iteration": { "start": 1, "step": 1}}}},
+        { "name": "nonce", "type": {"type": "long", "arg.properties": {"iteration": { "start": 1, "step": 1}}}},
         { "name": "creditlimit", "type": {"type": "double"}},
         { "name": "creditlimitcurrency", "type": {"type": "string", "arg.properties": {"regex": "USD"}}}
     ]

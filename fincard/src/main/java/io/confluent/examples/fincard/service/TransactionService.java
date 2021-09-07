@@ -48,7 +48,7 @@ public class TransactionService {
                 .setDatetime("NotNow")
                 .setId(id)
                 .setStatus("APPROVED")
-                .setNuance(Long.valueOf(System.currentTimeMillis()))
+                .setNonce(Long.valueOf(System.currentTimeMillis()))
                 .setReason("No Reason")
                 .build();
 
@@ -64,7 +64,7 @@ public class TransactionService {
         pojo.setDatetime(response.getDatetime());
         pojo.setId(response.getId());
         pojo.setStatus(response.getStatus());
-        pojo.setNuance(response.getNuance());
+        pojo.setNonce(response.getNonce());
         pojo.setReason(response.getReason());
 
         return pojo;

@@ -40,7 +40,7 @@ Venky Narayanan <vnarayanan@confluent.io>
 ----
 curl -X POST http://localhost:8080/fincard/transaction \
    -H 'Content-Type: application/json' \
-   -d '{"type": "CREDIT","customername": "Customer Name","zipcode" : "30092", "amount": 10.0, "currency": "USD", "cardnumber" : "12345", "expdate": "00/1020", "pin": "0909", "vendorid": 13, "deviceid": 45, "datetime": "6789", "location": "30041", "nuance": 100101}'
+   -d '{"type": "CREDIT","customername": "Customer Name","zipcode" : "30092", "amount": 10.0, "currency": "USD", "cardnumber" : "12345", "expdate": "00/1020", "pin": "0909", "vendorid": 13, "deviceid": 45, "datetime": "6789", "location": "30041", "nonce": 100101}'
 ----
 
 == TODOs
