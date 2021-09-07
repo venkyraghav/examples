@@ -4,6 +4,10 @@ kafka:
   client-id: ${spring.application.name}
 
 spring:
+  cloud:
+    stream:
+      default:
+        contentType: application/*+avro
   application:
     name: "fincard"
     version: 0.0.1
