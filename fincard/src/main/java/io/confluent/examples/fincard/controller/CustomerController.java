@@ -13,7 +13,7 @@ public class CustomerController {
     private CustomerService service;
 
     @GetMapping(value = "/{id}")
-    public Customer findById(@PathVariable("id") Long id) {
+    public Customer findById(@PathVariable("id") String id) {
         return RestPreconditions.checkFound(service.getCustomerDetail(id));
     }
 }

@@ -16,7 +16,7 @@ public class CustomerService {
         return new ArrayList<>(customerMap.values());
     }
 
-    public Customer getCustomerDetail(final long customerId) {
-        return customerMap.get(String.valueOf(customerId));
+    public Customer getCustomerDetail(final String customerId) {
+        return customerMap.get(customerId);
     }
 }

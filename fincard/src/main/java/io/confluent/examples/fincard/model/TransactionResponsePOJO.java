@@ -33,14 +33,6 @@ public class TransactionResponsePOJO {
         this.currency = currency;
     }
 
-    public long getCustomerid() {
-        return customerid;
-    }
-
-    public void setCustomerid(long customerid) {
-        this.customerid = customerid;
-    }
-
     public String getCustomername() {
         return customername;
     }
@@ -117,7 +109,6 @@ public class TransactionResponsePOJO {
     private String type;
     private double amount;
     private String currency;
-    private long customerid;
     private String customername;
     private String cardnumber;
     private String status;

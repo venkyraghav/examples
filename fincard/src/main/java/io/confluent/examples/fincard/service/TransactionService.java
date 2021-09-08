@@ -3,9 +3,6 @@ package io.confluent.examples.fincard.service;
 import io.confluent.examples.fincard.TransactionRequest;
 import io.confluent.examples.fincard.TransactionResponse;
 import io.confluent.examples.fincard.model.TransactionResponsePOJO;
-import org.apache.commons.lang3.NotImplementedException;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,8 +32,6 @@ public class TransactionService {
             approvalstatus = "APPROVED";
         }
 
-
-
         // generate UUID (use UUID.randomUUID()) and update transaction id
         String id = UUID.randomUUID().toString();
 
@@ -61,7 +56,6 @@ public class TransactionService {
                 .setCurrency(transaction.getCurrency())
                 .setCreditlimit(Double.valueOf(0.00))
                 .setCreditlimitcurrency(transaction.getCurrency())
-                .setCustomerid(Integer.valueOf(0))
                 .setCustomername(transaction.getCustomername())
                 .setDatetime("NotNow")
                 .setId(id)
@@ -78,7 +72,6 @@ public class TransactionService {
         pojo.setCurrency(response.getCurrency());
         pojo.setCreditlimit(response.getCreditlimit());
         pojo.setCreditlimitcurrency(response.getCreditlimitcurrency());
-        pojo.setCustomerid(response.getCustomerid());
         pojo.setCustomername(response.getCustomername());
         pojo.setDatetime(response.getDatetime());
         pojo.setId(response.getId());
