@@ -26,16 +26,34 @@ public class TransactionService {
         if (log.isDebugEnabled()) {
             log.debug("Transaction Request " + transaction.toString());
         }
+        String approvalstatus;
+        // Approve or Deny the transaction (randomly)
+        if (((Integer.parseInt(transaction.getCardnumber())+(Integer.parseInt(transaction.getZipcode())))%5)==0) {
+            approvalstatus = "DENIED";
+        }
+        else {
+            approvalstatus = "APPROVED";
+        }
 
-        // TODO Approve or Deny the transaction (randomly)
+
 
         // generate UUID (use UUID.randomUUID()) and update transaction id
         String id = UUID.randomUUID().toString();
 
         // Produce to Kafka
-        // kafkaTemplate.send(id, transaction);
+        kafkaTemplate.send("test2", id, transaction);
 
         // TODO update appropriate fields based on transaction type
+        double balance;
+        if (transaction.getType().equalsIgnoreCase("credit")) {
+            balance=Double.valueOf(transaction.getAmount());
+        }
+        else if (transaction.getType().equalsIgnoreCase("debit")){
+            balance = -(Double.valueOf(transaction.getAmount()));
+        }
+        else {
+            balance = 0;
+        }
         TransactionResponse response = TransactionResponse.newBuilder()
                 .setType(transaction.getType())
                 .setCardnumber(transaction.getCardnumber())
@@ -47,9 +65,10 @@ public class TransactionService {
                 .setCustomername(transaction.getCustomername())
                 .setDatetime("NotNow")
                 .setId(id)
-                .setStatus("APPROVED")
+                .setStatus(approvalstatus)
                 .setNonce(Long.valueOf(System.currentTimeMillis()))
                 .setReason("No Reason")
+                .setNewbalance(balance)
                 .build();
 
         TransactionResponsePOJO pojo = new TransactionResponsePOJO();
@@ -66,6 +85,7 @@ public class TransactionService {
         pojo.setStatus(response.getStatus());
         pojo.setNonce(response.getNonce());
         pojo.setReason(response.getReason());
+        pojo.setNewbalance(response.getNewbalance());
 
         return pojo;
     }

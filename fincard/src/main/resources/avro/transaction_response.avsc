@@ -16,6 +16,7 @@
         { "name": "datetime", "type": {"type": "string"}},
         { "name": "nonce", "type": {"type": "long", "arg.properties": {"iteration": { "start": 1, "step": 1}}}},
         { "name": "creditlimit", "type": {"type": "double"}},
-        { "name": "creditlimitcurrency", "type": {"type": "string", "arg.properties": {"regex": "USD"}}}
+        { "name": "creditlimitcurrency", "type": {"type": "string", "arg.properties": {"regex": "USD"}}},
+        { "name": "newbalance", "type": {"type": "double"}}
     ]
 }

@@ -105,6 +105,14 @@ public class TransactionResponsePOJO {
         this.creditlimitcurrency = creditlimitcurrency;
     }
 
+    public double getNewbalance() {
+        return newbalance;
+    }
+
+    public void setNewbalance(double newbalance) {
+        this.newbalance = newbalance;
+    }
+
     private String id;
     private String type;
     private double amount;
@@ -118,4 +126,5 @@ public class TransactionResponsePOJO {
     private long nonce;
     private double creditlimit;
     private String creditlimitcurrency;
+    private double newbalance;
 }
