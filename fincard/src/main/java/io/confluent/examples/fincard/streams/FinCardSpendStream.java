@@ -118,11 +118,11 @@ public class FinCardSpendStream {
 
         final StreamsBuilder builder = new StreamsBuilder();
         final KStream<String, SpecificRecord> stream = builder.stream(fromTopic);
-        final KStream<String, SpecificRecord> zipcodeRekey = stream.map(
+        final KStream<String, SpecificRecord> zipcodeRekey = stream.map( //thaat is part of tihs stream, setting key to zipcode
                 (KeyValueMapper<String, SpecificRecord, KeyValue<String, SpecificRecord>>) (s, specificRecord)
-                        -> new KeyValue<>(specificRecord.get(cardinal_zipcode).toString(), specificRecord)
+                        -> new KeyValue<>(specificRecord.get(cardinal_zipcode).toString(), specificRecord)//this creates a kafkatopic record
         );
-        zipcodeRekey.to(toTopic);
+        zipcodeRekey.to(toTopic);//persist stream to the topic (rekey operation)
 
         startStream(builder, streamsConfiguration);
     }
