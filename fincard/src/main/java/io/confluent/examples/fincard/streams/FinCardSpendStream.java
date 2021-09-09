@@ -158,10 +158,10 @@ public class FinCardSpendStream {
                 (transactionId, transactionRecord) -> {
                     LocationGroup locationGroup = new LocationGroup();
                     locationGroup.setCardnumber(transactionRecord.get(cardinal_cardnumber).toString());
-                    locationGroup.setZipcode(transactionRecord.get(cardinal_zipcode).toString());
+                    locationGroup.setLocation(transactionRecord.get(cardinal_location).toString());
 
-                    GenericRecord record = mapObjectToRecord(locationGroup);
-                    return new KeyValue<GenericRecord, SpecificRecord>(record, transactionRecord);
+                    GenericRecord recordKey = mapObjectToRecord(locationGroup);
+                    return new KeyValue<GenericRecord, SpecificRecord>(recordKey, transactionRecord);
                 }
         );
         zipcodeRekey.to(toTopic, Produced.with(genericAvroSerde, transactionRequestSerde));
@@ -188,12 +188,12 @@ public class FinCardSpendStream {
 }
 
 class LocationGroup {
-    public String getZipcode() {
-        return zipcode;
+    public String getLocation() {
+        return location;
     }
 
-    public void setZipcode(String zipcode) {
-        this.zipcode = zipcode;
+    public void setLocation(String location) {
+        this.location = location;
     }
 
     public String getCardnumber() {
@@ -204,7 +204,7 @@ class LocationGroup {
         this.cardnumber = cardnumber;
     }
 
-    private String zipcode;
+    private String location;
     private String cardnumber;
 
 }
