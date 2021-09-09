@@ -1,5 +1,5 @@
 kafka:
-  bootstrap-servers: localhost:9092
+  bootstrap-servers: localhost:9091
   schema.registry.url: http://localhost:8081
   client-id: ${spring.application.name}
 
@@ -25,20 +25,22 @@ spring:
       application-id: ${kafka.client-id}-${spring.application.version}
       auto-offset-reset: earliest
       schema.registry.url: ${kafka.schema.registry.url}
+      default.key.serde: org.apache.kafka.common.serialization.Serdes.StringSerde
+      default.value.serde: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde
       properties:
-        default.key.serde: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde
+        default.key.serde: org.apache.kafka.common.serialization.Serdes.StringSerde
         default.value.serde: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde
     consumer:
       group-id: ${kafka.client-id}-consumer
       client-id: ${kafka.client-id}
       application-id: ${kafka.client-id}-${spring.application.version}
       auto-offset-reset: earliest
-      key-deserializer: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerializer
+      key-deserializer: org.apache.kafka.common.serialization.StringSerializer
       value-deserializer: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerializer
     producer:
       client-id: ${kafka.client-id}
       application-id: ${spring.application.name}-${spring.application.version}
-      key-serializer: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerializer
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerializer
     template:
       default-topic:
