@@ -28,6 +28,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
+import io.confluent.examples.fincard.model.CardReason;
+import io.confluent.examples.fincard.model.CustomerAmountLocation;
 import scala.sys.Prop;
 
 import java.util.*;
@@ -218,7 +220,6 @@ public class FinCardSpendStream {
         String toTopic = "spendbyzipcode";
 
         if (log.isInfoEnabled()) {log.info("spendByZipcode stream started from %s to %s", fromTopic, toTopic);}
-
         Properties streamsConfiguration = getStreamProperties("zipcode");
         final Map<String, String> serdeConfig = Collections.singletonMap(
                 AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
@@ -227,7 +228,6 @@ public class FinCardSpendStream {
         genericAvroSerde.configure(serdeConfig, true);
         final Serde<SpecificRecord> transactionRequestSerde = new SpecificAvroSerde<SpecificRecord>();
         transactionRequestSerde.configure(serdeConfig, false);
-
         final StreamsBuilder builder = new StreamsBuilder();
         final KStream<String, SpecificRecord> stream = builder.stream(fromTopic);
         final KStream<GenericRecord, SpecificRecord> zipcodeRekey = stream.map(
@@ -549,7 +549,6 @@ public class FinCardSpendStream {
     public String getLocation() {
         return location;
     }
-
     public void setLocation(String location) {
         this.location = location;
     }
