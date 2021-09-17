@@ -1,6 +1,7 @@
 package io.confluent.examples.fincard.streams;
 
 import io.confluent.examples.fincard.TransactionRequest;
+import io.confluent.examples.fincard.model.CardReason;
 import io.confluent.examples.fincard.model.CustomerAmountLocation;
 import io.confluent.examples.fincard.model.CustomerVendorLocation;
 import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
@@ -68,6 +69,8 @@ public class FinCardSpendStream {
     private final int cardinal_datetime = 10;
     private final int cardinal_location = 11;
     private final int cardinal_nonce = 12;
+    private final int cardinal_reason = 13;
+
 
     private Properties getStreamProperties(String suffix) {
         Properties streamsConfiguration = new Properties();
@@ -114,10 +117,78 @@ public class FinCardSpendStream {
         startStream(builder, streamsConfiguration);
     }
 
+    @Bean
+    public void cvvRejections() {
+        String fromTopic = "test2";
+        String toTopic = "cvvrejections";
 
+        if (log.isInfoEnabled()) {log.info("cvvrejections stream started from %s to %s", fromTopic, toTopic);}
+
+        // Create Streams Config map. use `toTopic` suffix to differentiate consumer group
+        Properties streamsConfiguration = getStreamProperties(toTopic);
+
+        // Create collection with schema registry config for Serde object creation
+        final Map<String, String> serdeConfig = Collections.singletonMap(
+                AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
+
+        // Create GenericAvroSerde for use as key `isKey=true`
+        final Serde<GenericRecord> genericAvroKeySerde = new GenericAvroSerde();
+        genericAvroKeySerde.configure(serdeConfig, true);
+
+        // Create SpecificAvroSerde for use as value `isKey=false`
+        final Serde<SpecificRecord> transactionRequestValueSerde = new SpecificAvroSerde<SpecificRecord>();
+        transactionRequestValueSerde.configure(serdeConfig, false);
+
+        final StreamsBuilder builder = new StreamsBuilder();
+
+        // Init StreamsBuilder `fromTopic`
+        final KStream<String, SpecificRecord> stream = builder.stream(fromTopic);
+
+        // Rekey with customer cardnumber, vendor location and amount
+        final KStream<GenericRecord, SpecificRecord> reasonRekey = stream.map(
+                (transactionId, transactionRecord) -> {
+                    CardReason cardReason = new CardReason();
+                    cardReason.setCardnumber(transactionRecord.get(cardinal_cardnumber).toString());
+                    cardReason.setReason(transactionRecord.get(cardinal_reason).toString());
+
+                    GenericRecord recordKey = mapObjectToRecord(cardReason);
+                    return new KeyValue<GenericRecord, SpecificRecord>(recordKey, transactionRecord);
+                }
+        ).filter((genericRecord, specificRecord) -> {
+            return genericRecord.get(2).toString().equalsIgnoreCase("CVV");
+        });
+        // Persist to a `detail` topic
+        reasonRekey.to(toTopic + ".detail", Produced.with(genericAvroKeySerde, transactionRequestValueSerde));
+
+        // Group by the key
+        final KGroupedStream<GenericRecord, SpecificRecord> groupedStream = reasonRekey.groupByKey(Grouped.with(genericAvroKeySerde, transactionRequestValueSerde));
+
+        // Count by key
+        final KTable<Windowed<GenericRecord>, Long> countIs = groupedStream
+                .windowedBy(TimeWindows.of(Duration.ofMinutes(5)).advanceBy(Duration.ofMinutes(1)))
+                .count();
+
+        // Output the stream
+        // countIs.toStream().print(Printed.toSysOut());
+
+        // Create stream
+        KStream<Windowed<GenericRecord>, Long> countStream = countIs.toStream().filter((key,count) -> count > 1);
+
+        // Convert Long (count) to String
+        KStream<GenericRecord, String> countStreamToPersist = countStream.map(
+                (customerLocationByWindow, longCount) -> {
+                    GenericRecord key = customerLocationByWindow.key();
+                    return new KeyValue<>(key, longCount.toString());
+                }
+        );
+
+        // Persist to `toTopic`
+        countStreamToPersist.to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
+
+        startStream(builder, streamsConfiguration);
+    }
 
     // spend greater than 4000
-
     @Bean
     public void spendGreaterThan() {
         String fromTopic = "transactions";

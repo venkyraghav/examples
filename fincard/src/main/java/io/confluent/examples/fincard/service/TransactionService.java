@@ -33,8 +33,6 @@ public class TransactionService {
             approvalstatus = "APPROVED";
         }
 
-
-
        // if (transaction.getPin() != currentCustomer.getPin()) {
 
         //}
