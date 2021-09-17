@@ -113,8 +113,8 @@ public class FinCardSpendStream {
         return startStream(streamsBuilder, streamsConfiguration);
     }
 
-    // @Bean
-    public void cvvRejections(StreamsBuilder streamsBuilder) {
+    @Bean
+    public Topology cvvRejections() {
         String fromTopic = "test2";
         String toTopic = "cvvrejections";
 
@@ -136,6 +136,7 @@ public class FinCardSpendStream {
         transactionRequestValueSerde.configure(serdeConfig, false);
 
         // Init StreamsBuilder `fromTopic`
+        StreamsBuilder streamsBuilder = new StreamsBuilder();
         final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic);
 
         // Rekey with customer cardnumber, vendor location and amount
@@ -179,12 +180,12 @@ public class FinCardSpendStream {
         // Persist to `toTopic`
         countStreamToPersist.to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
 
-        startStream(streamsBuilder, streamsConfiguration);
+        return startStream(streamsBuilder, streamsConfiguration);
     }
 
     // spend greater than 4000
-    // @Bean
-    public void spendGreaterThan(StreamsBuilder streamsBuilder) {
+    @Bean
+    public Topology spendGreaterThan() {
         String fromTopic = "transactions";
         String toTopic = "spend-greater-than";
 
@@ -194,6 +195,7 @@ public class FinCardSpendStream {
         final Serde<String> stringSerde = Serdes.String();
         final Serde<TransactionRequest> transactionRequestSerde = new SpecificAvroSerde<TransactionRequest>();
 
+        StreamsBuilder streamsBuilder = new StreamsBuilder();
         final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic);
         final KStream<String, SpecificRecord> amountRekey = stream.map(
                 (KeyValueMapper<String, SpecificRecord, KeyValue<String, SpecificRecord>>) (s, specificRecord)
@@ -202,7 +204,7 @@ public class FinCardSpendStream {
 
         amountRekey.filter((s, specificRecord) -> 3999.99 < Double.valueOf(s))
                 .to(toTopic);
-        startStream(streamsBuilder, streamsConfiguration);
+        return startStream(streamsBuilder, streamsConfiguration);
     }
 
     /*@Bean
@@ -247,8 +249,8 @@ public class FinCardSpendStream {
 
     }*/
 
-    // @Bean
-    public void spendByZipcode(StreamsBuilder streamsBuilder) {
+    @Bean
+    public Topology spendByZipcode() {
         String fromTopic = "transactions";
         String toTopic = "spendbyzipcode-1";
 
@@ -270,6 +272,7 @@ public class FinCardSpendStream {
         transactionRequestValueSerde.configure(serdeConfig, false);
 
         // Init StreamsBuilder `fromTopic`
+        StreamsBuilder streamsBuilder = new StreamsBuilder();
         final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic);
 
         // Rekey with customer cardnumber and vendor location
@@ -315,11 +318,11 @@ public class FinCardSpendStream {
         // Persist to `toTopic`
         countStreamToPersist.to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
 
-        startStream(streamsBuilder, streamsConfiguration);
+        return startStream(streamsBuilder, streamsConfiguration);
     }
 
-    // @Bean
-    public void spendbyamountlocation(StreamsBuilder streamsBuilder) {
+    @Bean
+    public Topology spendbyamountlocation() {
 
         String fromTopic = "transactions";
         String toTopic = "spendbyamountlocation";
@@ -344,6 +347,7 @@ public class FinCardSpendStream {
         transactionRequestValueSerde.configure(serdeConfig, false);
 
         // Init StreamsBuilder `fromTopic`
+        StreamsBuilder streamsBuilder = new StreamsBuilder();
         final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic);
 
         // Rekey with customer cardnumber and vendor location and amount
@@ -390,11 +394,11 @@ public class FinCardSpendStream {
         // Persist to `toTopic`
         countStreamToPersist.to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
 
-        startStream(streamsBuilder, streamsConfiguration);
+        return startStream(streamsBuilder, streamsConfiguration);
     }
 
-    // @Bean
-    public void differentLocations(StreamsBuilder streamsBuilder) {
+    @Bean
+    public Topology differentLocations() {
         String fromTopic = "transactions";
         String toTopic = "differentlocations";
 
@@ -415,6 +419,7 @@ public class FinCardSpendStream {
         transactionRequestSerde.configure(serdeConfig, false);
 
         // Init StreamsBuilder `fromTopic`
+        StreamsBuilder streamsBuilder = new StreamsBuilder();
         final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic);
 
 
@@ -449,11 +454,11 @@ public class FinCardSpendStream {
                 .to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
         ;
 
-        startStream(streamsBuilder, streamsConfiguration);
+        return startStream(streamsBuilder, streamsConfiguration);
     }
 
-    // @Bean
-    public void spendByZipcodeConcise(StreamsBuilder streamsBuilder) {
+    @Bean
+    public Topology spendByZipcodeConcise() {
         String fromTopic = "transactions";
         String toTopic = "spendbyzipcode.concise";
 
@@ -475,6 +480,7 @@ public class FinCardSpendStream {
         transactionRequestSerde.configure(serdeConfig, false);
 
         // Init StreamsBuilder `fromTopic`
+        StreamsBuilder streamsBuilder = new StreamsBuilder();
         final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic);
 
         // Rekey with customer cardnumber and vendor location
@@ -498,7 +504,7 @@ public class FinCardSpendStream {
                 .to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
         ;
 
-        startStream(streamsBuilder, streamsConfiguration);
+        return startStream(streamsBuilder, streamsConfiguration);
     }
 
     /*@Bean
