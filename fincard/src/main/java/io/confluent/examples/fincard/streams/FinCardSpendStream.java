@@ -15,26 +15,18 @@ import org.apache.avro.specific.SpecificRecord;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.KeyValue;
-import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.kstream.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.PropertyAccessorFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
-import io.confluent.examples.fincard.model.CardReason;
-import io.confluent.examples.fincard.model.CustomerAmountLocation;
-import scala.sys.Prop;
 
-import java.util.*;
 import java.time.Duration;
-import java.util.stream.Collectors;
+import java.util.*;
 
 @Service
 public class FinCardSpendStream {
@@ -89,8 +81,9 @@ public class FinCardSpendStream {
         return streamsConfiguration;
     }
 
-    private void startStream(StreamsBuilder builder, Properties streamsConfiguration) {
-        final KafkaStreams streams = new KafkaStreams(builder.build(), streamsConfiguration);
+    private Topology startStream(StreamsBuilder builder, Properties streamsConfiguration) {
+        Topology topology = builder.build();
+        final KafkaStreams streams = new KafkaStreams(topology, streamsConfiguration);
         streams.cleanUp();
         streams.start();
 
@@ -101,10 +94,11 @@ public class FinCardSpendStream {
                 streams.close();
             }
         }));
+        return topology;
     }
 
     @Bean
-    public void justCopy() {
+    public Topology justCopy() {
         String fromTopic = "transactions";
         String toTopic = "transaction2";
 
@@ -112,15 +106,15 @@ public class FinCardSpendStream {
 
         Properties streamsConfiguration = getStreamProperties("copy");
 
-        final StreamsBuilder builder = new StreamsBuilder();
-        final KStream<String, SpecificRecord> stream = builder.stream(fromTopic);
+        StreamsBuilder streamsBuilder = new StreamsBuilder();
+        final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic);
         stream.to(toTopic);
 
-        startStream(builder, streamsConfiguration);
+        return startStream(streamsBuilder, streamsConfiguration);
     }
 
-    @Bean
-    public void cvvRejections() {
+    // @Bean
+    public void cvvRejections(StreamsBuilder streamsBuilder) {
         String fromTopic = "test2";
         String toTopic = "cvvrejections";
 
@@ -141,10 +135,8 @@ public class FinCardSpendStream {
         final Serde<SpecificRecord> transactionRequestValueSerde = new SpecificAvroSerde<SpecificRecord>();
         transactionRequestValueSerde.configure(serdeConfig, false);
 
-        final StreamsBuilder builder = new StreamsBuilder();
-
         // Init StreamsBuilder `fromTopic`
-        final KStream<String, SpecificRecord> stream = builder.stream(fromTopic);
+        final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic);
 
         // Rekey with customer cardnumber, vendor location and amount
         final KStream<GenericRecord, SpecificRecord> reasonRekey = stream.map(
@@ -187,12 +179,12 @@ public class FinCardSpendStream {
         // Persist to `toTopic`
         countStreamToPersist.to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
 
-        startStream(builder, streamsConfiguration);
+        startStream(streamsBuilder, streamsConfiguration);
     }
 
     // spend greater than 4000
-    @Bean
-    public void spendGreaterThan() {
+    // @Bean
+    public void spendGreaterThan(StreamsBuilder streamsBuilder) {
         String fromTopic = "transactions";
         String toTopic = "spend-greater-than";
 
@@ -202,8 +194,7 @@ public class FinCardSpendStream {
         final Serde<String> stringSerde = Serdes.String();
         final Serde<TransactionRequest> transactionRequestSerde = new SpecificAvroSerde<TransactionRequest>();
 
-        final StreamsBuilder builder = new StreamsBuilder();
-        final KStream<String, SpecificRecord> stream = builder.stream(fromTopic);
+        final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic);
         final KStream<String, SpecificRecord> amountRekey = stream.map(
                 (KeyValueMapper<String, SpecificRecord, KeyValue<String, SpecificRecord>>) (s, specificRecord)
                         -> new KeyValue<>(specificRecord.get(cardinal_amount).toString(), specificRecord) //this creates a kafkatopic record
@@ -211,7 +202,7 @@ public class FinCardSpendStream {
 
         amountRekey.filter((s, specificRecord) -> 3999.99 < Double.valueOf(s))
                 .to(toTopic);
-        startStream(builder, streamsConfiguration);
+        startStream(streamsBuilder, streamsConfiguration);
     }
 
     /*@Bean
@@ -256,8 +247,8 @@ public class FinCardSpendStream {
 
     }*/
 
-    @Bean
-    public void spendByZipcode() {
+    // @Bean
+    public void spendByZipcode(StreamsBuilder streamsBuilder) {
         String fromTopic = "transactions";
         String toTopic = "spendbyzipcode-1";
 
@@ -278,10 +269,8 @@ public class FinCardSpendStream {
         final Serde<SpecificRecord> transactionRequestValueSerde = new SpecificAvroSerde<SpecificRecord>();
         transactionRequestValueSerde.configure(serdeConfig, false);
 
-        final StreamsBuilder builder = new StreamsBuilder();
-
         // Init StreamsBuilder `fromTopic`
-        final KStream<String, SpecificRecord> stream = builder.stream(fromTopic);
+        final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic);
 
         // Rekey with customer cardnumber and vendor location
         final KStream<GenericRecord, SpecificRecord> zipcodeRekey = stream.map(
@@ -326,11 +315,11 @@ public class FinCardSpendStream {
         // Persist to `toTopic`
         countStreamToPersist.to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
 
-        startStream(builder, streamsConfiguration);
+        startStream(streamsBuilder, streamsConfiguration);
     }
 
-    @Bean
-    public void spendbyamountlocation() {
+    // @Bean
+    public void spendbyamountlocation(StreamsBuilder streamsBuilder) {
 
         String fromTopic = "transactions";
         String toTopic = "spendbyamountlocation";
@@ -354,10 +343,8 @@ public class FinCardSpendStream {
         final Serde<SpecificRecord> transactionRequestValueSerde = new SpecificAvroSerde<SpecificRecord>();
         transactionRequestValueSerde.configure(serdeConfig, false);
 
-        final StreamsBuilder builder = new StreamsBuilder();
-
         // Init StreamsBuilder `fromTopic`
-        final KStream<String, SpecificRecord> stream = builder.stream(fromTopic);
+        final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic);
 
         // Rekey with customer cardnumber and vendor location and amount
         final KStream<GenericRecord, SpecificRecord> zipcodeRekey = stream.map(
@@ -403,11 +390,11 @@ public class FinCardSpendStream {
         // Persist to `toTopic`
         countStreamToPersist.to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
 
-        startStream(builder, streamsConfiguration);
+        startStream(streamsBuilder, streamsConfiguration);
     }
 
-    @Bean
-    public void differentLocations() {
+    // @Bean
+    public void differentLocations(StreamsBuilder streamsBuilder) {
         String fromTopic = "transactions";
         String toTopic = "differentlocations";
 
@@ -428,8 +415,7 @@ public class FinCardSpendStream {
         transactionRequestSerde.configure(serdeConfig, false);
 
         // Init StreamsBuilder `fromTopic`
-        final StreamsBuilder builder = new StreamsBuilder();
-        final KStream<String, SpecificRecord> stream = builder.stream(fromTopic);
+        final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic);
 
 
         HashMap<String, HashSet<String>> cardToLocs = new HashMap<>();
@@ -463,11 +449,11 @@ public class FinCardSpendStream {
                 .to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
         ;
 
-        startStream(builder, streamsConfiguration);
+        startStream(streamsBuilder, streamsConfiguration);
     }
 
-    @Bean
-    public void spendByZipcodeConcise() {
+    // @Bean
+    public void spendByZipcodeConcise(StreamsBuilder streamsBuilder) {
         String fromTopic = "transactions";
         String toTopic = "spendbyzipcode.concise";
 
@@ -489,8 +475,7 @@ public class FinCardSpendStream {
         transactionRequestSerde.configure(serdeConfig, false);
 
         // Init StreamsBuilder `fromTopic`
-        final StreamsBuilder builder = new StreamsBuilder();
-        final KStream<String, SpecificRecord> stream = builder.stream(fromTopic);
+        final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic);
 
         // Rekey with customer cardnumber and vendor location
         stream.map(
@@ -513,11 +498,11 @@ public class FinCardSpendStream {
                 .to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
         ;
 
-        startStream(builder, streamsConfiguration);
+        startStream(streamsBuilder, streamsConfiguration);
     }
 
     /*@Bean
-    public void differentLocations() {
+    public void differentLocations(StreamsBuilder streamsBuilder) {
         String fromTopic = "transactions";
         String toTopic = "differentlocations";
 
@@ -543,25 +528,4 @@ public class FinCardSpendStream {
         record.getSchema().getFields().forEach(d -> PropertyAccessorFactory.forDirectFieldAccess(object).setPropertyValue(d.name(), record.get(d.name()) == null ? record.get(d.name()) : record.get(d.name()).toString()));
         return object;
     }
-}
-
- class LocationGroup {
-    public String getLocation() {
-        return location;
-    }
-    public void setLocation(String location) {
-        this.location = location;
-    }
-
-    public String getCardnumber() {
-        return cardnumber;
-    }
-
-    public void setCardnumber(String cardnumber) {
-        this.cardnumber = cardnumber;
-    }
-
-    private String location;
-    private String cardnumber;
-
 }

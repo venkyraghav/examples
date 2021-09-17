@@ -13,6 +13,7 @@
 **/target
 **/.idea
 **/.settings
+**/*.iml
 
 # Package Files #
 *.jar
