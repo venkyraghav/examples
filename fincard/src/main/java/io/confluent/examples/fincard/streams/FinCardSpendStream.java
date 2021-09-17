@@ -1,6 +1,8 @@
 package io.confluent.examples.fincard.streams;
 
 import io.confluent.examples.fincard.TransactionRequest;
+import io.confluent.examples.fincard.model.CustomerAmountLocation;
+import io.confluent.examples.fincard.model.CustomerVendorLocation;
 import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
 import io.confluent.kafka.streams.serdes.avro.GenericAvroSerde;
 import io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde;
@@ -16,9 +18,7 @@ import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
-import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.KeyValueMapper;
-import org.apache.kafka.streams.kstream.Produced;
+import org.apache.kafka.streams.kstream.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.PropertyAccessorFactory;
@@ -29,9 +29,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import scala.sys.Prop;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
+import java.time.Duration;
+import java.util.stream.Collectors;
 
 @Service
 public class FinCardSpendStream {
@@ -100,7 +100,7 @@ public class FinCardSpendStream {
 
     @Bean
     public void justCopy() {
-        String fromTopic = "test2";
+        String fromTopic = "transactions";
         String toTopic = "transaction2";
 
         if (log.isInfoEnabled()) {log.info("justCopy stream started from %s to %s", fromTopic, toTopic);}
@@ -114,31 +114,36 @@ public class FinCardSpendStream {
         startStream(builder, streamsConfiguration);
     }
 
-    // @Bean
-    public void spendByZipcodeOld() {
-        String fromTopic = "test2";
-        String toTopic = "spendbyzipcodeold";
 
-        if (log.isInfoEnabled()) {log.info("spendByZipcodeOld stream started from %s to %s", fromTopic, toTopic);}
 
-        Properties streamsConfiguration = getStreamProperties("zipcode");
+    // spend greater than 4000
+
+    @Bean
+    public void spendGreaterThan() {
+        String fromTopic = "transactions";
+        String toTopic = "spend-greater-than";
+
+        if (log.isInfoEnabled()) {log.info("spendGreaterThan stream started from %s to %s", fromTopic, toTopic);}
+
+        Properties streamsConfiguration = getStreamProperties("spend");
         final Serde<String> stringSerde = Serdes.String();
         final Serde<TransactionRequest> transactionRequestSerde = new SpecificAvroSerde<TransactionRequest>();
 
         final StreamsBuilder builder = new StreamsBuilder();
         final KStream<String, SpecificRecord> stream = builder.stream(fromTopic);
-        final KStream<String, SpecificRecord> zipcodeRekey = stream.map( //thaat is part of tihs stream, setting key to zipcode
+        final KStream<String, SpecificRecord> amountRekey = stream.map(
                 (KeyValueMapper<String, SpecificRecord, KeyValue<String, SpecificRecord>>) (s, specificRecord)
-                        -> new KeyValue<>(specificRecord.get(cardinal_zipcode).toString(), specificRecord)//this creates a kafkatopic record
+                        -> new KeyValue<>(specificRecord.get(cardinal_amount).toString(), specificRecord) //this creates a kafkatopic record
         );
-        zipcodeRekey.to(toTopic);//persist stream to the topic (rekey operation)
 
+        amountRekey.filter((s, specificRecord) -> 3999.99 < Double.valueOf(s))
+                .to(toTopic);
         startStream(builder, streamsConfiguration);
     }
 
-    @Bean
+    /*@Bean
     public void spendByZipcode() {
-        String fromTopic = "test2";
+        String fromTopic = "transactions";
         String toTopic = "spendbyzipcode";
 
         if (log.isInfoEnabled()) {log.info("spendByZipcode stream started from %s to %s", fromTopic, toTopic);}
@@ -167,7 +172,289 @@ public class FinCardSpendStream {
         zipcodeRekey.to(toTopic, Produced.with(genericAvroSerde, transactionRequestSerde));
 
         startStream(builder, streamsConfiguration);
+    } */
+
+    /*@Bean
+    public void incorrectPin() {
+        String fromTopic = "transactions";
+        String toTopic = "incorrectpin";
+
+        if (log.isInfoEnabled()) {log.info("incorrectPin stream started from %s to %s", fromTopic, toTopic);}
+
+        Properties streamsConfiguration = getStreamProperties("incorrect");
+
+    }*/
+
+    @Bean
+    public void spendByZipcode() {
+        String fromTopic = "transactions";
+        String toTopic = "spendbyzipcode-1";
+
+        if (log.isInfoEnabled()) {log.info("spendByZipcode stream started from %s to %s", fromTopic, toTopic);}
+
+        // Create Streams Config map. use `toTopic` suffix to differentiate consumer group
+        Properties streamsConfiguration = getStreamProperties(toTopic);
+
+        // Create collection with schema registry config for Serde object creation
+        final Map<String, String> serdeConfig = Collections.singletonMap(
+                AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
+
+        // Create GenericAvroSerde for use as key `isKey=true`
+        final Serde<GenericRecord> genericAvroKeySerde = new GenericAvroSerde();
+        genericAvroKeySerde.configure(serdeConfig, true);
+
+        // Create SpecificAvroSerde for use as value `isKey=false`
+        final Serde<SpecificRecord> transactionRequestValueSerde = new SpecificAvroSerde<SpecificRecord>();
+        transactionRequestValueSerde.configure(serdeConfig, false);
+
+        final StreamsBuilder builder = new StreamsBuilder();
+
+        // Init StreamsBuilder `fromTopic`
+        final KStream<String, SpecificRecord> stream = builder.stream(fromTopic);
+
+        // Rekey with customer cardnumber and vendor location
+        final KStream<GenericRecord, SpecificRecord> zipcodeRekey = stream.map(
+                (transactionId, transactionRecord) -> {
+                    CustomerVendorLocation customerVendorLocation = new CustomerVendorLocation();
+                    customerVendorLocation.setCardnumber(transactionRecord.get(cardinal_cardnumber).toString());
+                    customerVendorLocation.setLocation(transactionRecord.get(cardinal_location).toString());
+
+                    GenericRecord recordKey = mapObjectToRecord(customerVendorLocation);
+                    return new KeyValue<GenericRecord, SpecificRecord>(recordKey, transactionRecord);
+                }
+        );
+        // Persist to a `detail` topic
+        zipcodeRekey.to(toTopic + ".detail", Produced.with(genericAvroKeySerde, transactionRequestValueSerde));
+
+        // Group by the key
+        final KGroupedStream<GenericRecord, SpecificRecord> groupedStream = zipcodeRekey.groupByKey(Grouped.with(genericAvroKeySerde, transactionRequestValueSerde));
+
+        final KTable<Windowed<GenericRecord>, Long> countIs = groupedStream
+                .windowedBy(TimeWindows.of(Duration.ofMinutes(5)).advanceBy(Duration.ofMinutes(1)))
+                .count();
+
+        // Count by key
+        //final KTable<GenericRecord, Long> countIs = groupedStream.count();
+
+        // Output the stream
+        // countIs.toStream().print(Printed.toSysOut());
+
+        // Create stream
+        //KStream<GenericRecord, Long> countStream = countIs.toStream();
+        KStream<Windowed<GenericRecord>, Long> countStream = countIs.toStream().filter((key, count) -> count >= 3);
+
+        // Convert Long (count) to String
+        //KStream<GenericRecord, String> countStreamToPersist = countStream.mapValues(v -> v.toString());
+        KStream<GenericRecord, String> countStreamToPersist = countStream.map(
+                (customerLocationByWindow, longCount) -> {
+                    GenericRecord key = customerLocationByWindow.key();
+                    return new KeyValue<>(key, longCount.toString());
+                }
+        );
+
+        // Persist to `toTopic`
+        countStreamToPersist.to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
+
+        startStream(builder, streamsConfiguration);
     }
+
+    @Bean
+    public void spendbyamountlocation() {
+
+        String fromTopic = "transactions";
+        String toTopic = "spendbyamountlocation";
+
+        if (log.isInfoEnabled()) {
+            log.info("spendbyamountlocation stream started from %s to %s", fromTopic, toTopic);
+        }
+
+        // Create Streams Config map. use `toTopic` suffix to differentiate consumer group
+        Properties streamsConfiguration = getStreamProperties(toTopic);
+
+        // Create collection with schema registry config for Serde object creation
+        final Map<String, String> serdeConfig = Collections.singletonMap(
+                AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
+
+        // Create GenericAvroSerde for use as key `isKey=true`
+        final Serde<GenericRecord> genericAvroKeySerde = new GenericAvroSerde();
+        genericAvroKeySerde.configure(serdeConfig, true);
+
+        // Create SpecificAvroSerde for use as value `isKey=false`
+        final Serde<SpecificRecord> transactionRequestValueSerde = new SpecificAvroSerde<SpecificRecord>();
+        transactionRequestValueSerde.configure(serdeConfig, false);
+
+        final StreamsBuilder builder = new StreamsBuilder();
+
+        // Init StreamsBuilder `fromTopic`
+        final KStream<String, SpecificRecord> stream = builder.stream(fromTopic);
+
+        // Rekey with customer cardnumber and vendor location and amount
+        final KStream<GenericRecord, SpecificRecord> zipcodeRekey = stream.map(
+                (transactionId, transactionRecord) -> {
+                    CustomerAmountLocation customerAmountLocation = new CustomerAmountLocation();
+                    customerAmountLocation.setCardnumber(transactionRecord.get(cardinal_cardnumber).toString());
+                    customerAmountLocation.setLocation(transactionRecord.get(cardinal_location).toString());
+                    customerAmountLocation.setAmount(transactionRecord.get(cardinal_amount).toString());
+
+                    GenericRecord recordKey = mapObjectToRecord(customerAmountLocation);
+                    return new KeyValue<GenericRecord, SpecificRecord>(recordKey, transactionRecord);
+                }
+        );
+        // Persist to a `detail` topic
+        zipcodeRekey.to(toTopic + ".detail", Produced.with(genericAvroKeySerde, transactionRequestValueSerde));
+
+        // Group by the key
+        final KGroupedStream<GenericRecord, SpecificRecord> groupedStream = zipcodeRekey.groupByKey(Grouped.with(genericAvroKeySerde, transactionRequestValueSerde));
+
+        final KTable<Windowed<GenericRecord>, Long> countIs = groupedStream
+                .windowedBy(TimeWindows.of(Duration.ofMinutes(5)).advanceBy(Duration.ofMinutes(1)))
+                .count();
+
+        // Count by key
+        //final KTable<GenericRecord, Long> countIs = groupedStream.count();
+
+        // Output the stream
+        // countIs.toStream().print(Printed.toSysOut());
+
+        // Create stream
+        //KStream<GenericRecord, Long> countStream = countIs.toStream();
+        KStream<Windowed<GenericRecord>, Long> countStream = countIs.toStream().filter((key, count) -> count >= 2);
+
+        // Convert Long (count) to String
+        //KStream<GenericRecord, String> countStreamToPersist = countStream.mapValues(v -> v.toString());
+        KStream<GenericRecord, String> countStreamToPersist = countStream.map(
+                (customerLocationByWindow, longCount) -> {
+                    GenericRecord key = customerLocationByWindow.key();
+                    return new KeyValue<>(key, longCount.toString());
+                }
+        );
+
+        // Persist to `toTopic`
+        countStreamToPersist.to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
+
+        startStream(builder, streamsConfiguration);
+    }
+
+    @Bean
+    public void differentLocations() {
+        String fromTopic = "transactions";
+        String toTopic = "differentlocations";
+
+        if (log.isInfoEnabled()) {log.info("differentLocations stream started from %s to %s", fromTopic, toTopic);}
+
+        Properties streamsConfiguration = getStreamProperties("different");
+
+        // Create collection with schema registry config for Serde object creation
+        final Map<String, String> serdeConfig = Collections.singletonMap(
+                AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
+
+        // Create GenericAvroSerde for use as key `isKey=true`
+        final Serde<GenericRecord> genericAvroKeySerde = new GenericAvroSerde();
+        genericAvroKeySerde.configure(serdeConfig, true);
+
+        // Create SpecificAvroSerde for use as value `isKey=false`
+        final Serde<SpecificRecord> transactionRequestSerde = new SpecificAvroSerde<SpecificRecord>();
+        transactionRequestSerde.configure(serdeConfig, false);
+
+        // Init StreamsBuilder `fromTopic`
+        final StreamsBuilder builder = new StreamsBuilder();
+        final KStream<String, SpecificRecord> stream = builder.stream(fromTopic);
+
+
+        HashMap<String, HashSet<String>> cardToLocs = new HashMap<>();
+        stream.filter((transactionId, transactionRecord) -> {
+            String cardNum = transactionRecord.get(cardinal_cardnumber).toString();
+            String loc = transactionRecord.get(cardinal_location).toString();
+            HashSet<String> locs = cardToLocs.getOrDefault(cardNum, new HashSet<>());
+            locs.add(loc);
+            cardToLocs.put(cardNum, locs);
+            if (locs.size() >= 2) {
+                return true;
+            }
+                return false;
+        })
+                .map((transactionId, transactionRecord) -> {
+                    CustomerVendorLocation customerVendorLocation = new CustomerVendorLocation();
+                    customerVendorLocation.setCardnumber(transactionRecord.get(cardinal_cardnumber).toString());
+                    customerVendorLocation.setLocation(transactionRecord.get(cardinal_location).toString());
+                    GenericRecord recordKey = mapObjectToRecord(customerVendorLocation);
+
+                    return new KeyValue<GenericRecord, SpecificRecord>(recordKey, transactionRecord);
+                })
+                // Group by the key
+                .groupByKey(Grouped.with(genericAvroKeySerde, transactionRequestSerde))
+                // Count by key
+                .count()
+                // Create stream and convert Long (count) to String
+                .toStream()
+                .mapValues(v -> v.toString())
+                // Persist to the `toTopic`
+                .to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
+        ;
+
+        startStream(builder, streamsConfiguration);
+    }
+
+    @Bean
+    public void spendByZipcodeConcise() {
+        String fromTopic = "transactions";
+        String toTopic = "spendbyzipcode.concise";
+
+        if (log.isInfoEnabled()) {log.info("spendByZipcodeConcise stream started from %s to %s", fromTopic, toTopic);}
+
+        // Create Streams Config map. use `toTopic` suffix to differentiate consumer group
+        Properties streamsConfiguration = getStreamProperties(toTopic);
+
+        // Create collection with schema registry config for Serde object creation
+        final Map<String, String> serdeConfig = Collections.singletonMap(
+                AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
+
+        // Create GenericAvroSerde for use as key `isKey=true`
+        final Serde<GenericRecord> genericAvroKeySerde = new GenericAvroSerde();
+        genericAvroKeySerde.configure(serdeConfig, true);
+
+        // Create SpecificAvroSerde for use as value `isKey=false`
+        final Serde<SpecificRecord> transactionRequestSerde = new SpecificAvroSerde<SpecificRecord>();
+        transactionRequestSerde.configure(serdeConfig, false);
+
+        // Init StreamsBuilder `fromTopic`
+        final StreamsBuilder builder = new StreamsBuilder();
+        final KStream<String, SpecificRecord> stream = builder.stream(fromTopic);
+
+        // Rekey with customer cardnumber and vendor location
+        stream.map(
+                (transactionId, transactionRecord) -> {
+                    CustomerVendorLocation customerVendorLocation = new CustomerVendorLocation();
+                    customerVendorLocation.setCardnumber(transactionRecord.get(cardinal_cardnumber).toString());
+                    customerVendorLocation.setLocation(transactionRecord.get(cardinal_location).toString());
+
+                    GenericRecord recordKey = mapObjectToRecord(customerVendorLocation);
+                    return new KeyValue<GenericRecord, SpecificRecord>(recordKey, transactionRecord);
+                })
+                // Group by the key
+                .groupByKey(Grouped.with(genericAvroKeySerde, transactionRequestSerde))
+                // Count by key
+                .count()
+                // Create stream and convert Long (count) to String
+                .toStream()
+                .mapValues(v -> v.toString())
+                // Persist to the `toTopic`
+                .to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
+        ;
+
+        startStream(builder, streamsConfiguration);
+    }
+
+    /*@Bean
+    public void differentLocations() {
+        String fromTopic = "transactions";
+        String toTopic = "differentlocations";
+
+        if (log.isInfoEnabled()) {log.info("differentLocations stream started from %s to %s", fromTopic, toTopic);}
+
+        Properties streamsConfiguration = getStreamProperties("different");
+
+    }*/
 
     private GenericData.Record mapObjectToRecord(Object object) {
         Assert.notNull(object, "object must not be null");
@@ -187,7 +474,7 @@ public class FinCardSpendStream {
     }
 }
 
-class LocationGroup {
+ class LocationGroup {
     public String getLocation() {
         return location;
     }

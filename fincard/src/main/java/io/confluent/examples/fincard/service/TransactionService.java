@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import io.confluent.examples.fincard.service.CustomerService;
 
 import java.util.UUID;
 
@@ -32,11 +33,17 @@ public class TransactionService {
             approvalstatus = "APPROVED";
         }
 
+
+
+       // if (transaction.getPin() != currentCustomer.getPin()) {
+
+        //}
+
         // generate UUID (use UUID.randomUUID()) and update transaction id
         String id = UUID.randomUUID().toString();
 
         // Produce to Kafka
-        kafkaTemplate.send("test2", id, transaction);
+        kafkaTemplate.send("transactions", id, transaction);
 
         // TODO update appropriate fields based on transaction type
         double balance;
