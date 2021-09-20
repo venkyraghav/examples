@@ -115,12 +115,26 @@
 		<dependency>
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-core</artifactId>
-			<version>2.21.0</version>
+			<version>3.6.28</version>
 		</dependency>
 		<dependency>
-			<groupId>org.mockito</groupId>
-			<artifactId>mockito-inline</artifactId>
-			<version>2.15.0</version>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>org.junit</groupId>
+					<artifactId>junit</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.mockito</groupId>
+					<artifactId>mockito-core</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.mockito</groupId>
+					<artifactId>mockito-all</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.dataformat</groupId>
@@ -135,7 +149,7 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 				<configuration>
-					<excludeDevtools>false</excludeDevtools>
+					<excludeDevtools>true</excludeDevtools>
 				</configuration>
 			</plugin>
 			<plugin>

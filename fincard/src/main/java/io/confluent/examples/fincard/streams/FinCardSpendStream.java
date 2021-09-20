@@ -66,7 +66,7 @@ public class FinCardSpendStream {
     private final int cardinal_reason = 13;
 
 
-    private Properties getStreamProperties(String suffix) {
+    public Properties getStreamProperties(String suffix) {
         Properties streamsConfiguration = new Properties();
         streamsConfiguration.put(StreamsConfig.APPLICATION_ID_CONFIG, groupId + "-" + suffix);
         streamsConfiguration.put(StreamsConfig.CLIENT_ID_CONFIG, applicationId + "-" + suffix);
@@ -249,12 +249,12 @@ public class FinCardSpendStream {
 
     }*/
 
-    @Bean
-    public Topology spendByZipcode() {
+    /*@Bean
+    public Topology spendByZipcode2() {
         String fromTopic = "transactions";
         String toTopic = "spendbyzipcode-1";
 
-        if (log.isInfoEnabled()) {log.info("spendByZipcode stream started from %s to %s", fromTopic, toTopic);}
+        if (log.isInfoEnabled()) {log.info("spendByZipcode stream started from {} to {}", fromTopic, toTopic);}
 
         // Create Streams Config map. use `toTopic` suffix to differentiate consumer group
         Properties streamsConfiguration = getStreamProperties(toTopic);
@@ -262,6 +262,9 @@ public class FinCardSpendStream {
         // Create collection with schema registry config for Serde object creation
         final Map<String, String> serdeConfig = Collections.singletonMap(
                 AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
+
+        final Serde<String> stringAvroKeySerde = Serdes.String();
+        stringAvroKeySerde.configure(serdeConfig, true);
 
         // Create GenericAvroSerde for use as key `isKey=true`
         final Serde<GenericRecord> genericAvroKeySerde = new GenericAvroSerde();
@@ -273,7 +276,70 @@ public class FinCardSpendStream {
 
         // Init StreamsBuilder `fromTopic`
         StreamsBuilder streamsBuilder = new StreamsBuilder();
-        final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic);
+        final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic, Consumed.with(stringAvroKeySerde, transactionRequestValueSerde));
+
+        // Rekey with customer cardnumber and vendor location
+        final KStream<GenericRecord, SpecificRecord> zipcodeRekey = stream.map(
+                (transactionId, transactionRecord) -> {
+                    CustomerVendorLocation customerVendorLocation = new CustomerVendorLocation();
+                    customerVendorLocation.setCardnumber(transactionRecord.get(cardinal_cardnumber).toString());
+                    customerVendorLocation.setLocation(transactionRecord.get(cardinal_location).toString());
+
+                    GenericRecord recordKey = mapObjectToRecord(customerVendorLocation);
+                    return new KeyValue<GenericRecord, SpecificRecord>(recordKey, transactionRecord);
+                }
+        );
+
+        // Group by the key
+        final KGroupedStream<GenericRecord, SpecificRecord> groupedStream = zipcodeRekey.groupByKey(Grouped.with(genericAvroKeySerde, transactionRequestValueSerde));
+
+        final KTable<GenericRecord, String> countIs = groupedStream
+                .count()
+                .filter(
+                        (key, count) -> {
+                            if (count > 2) {
+                                return true;
+                            }
+                            return false;
+                        })
+                .mapValues(v -> v.toString())
+                ;
+
+        // Persist to `toTopic`
+        countIs.toStream().to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
+
+        return startStream(streamsBuilder, streamsConfiguration);
+    }
+     */
+
+    @Bean
+    public Topology spendByZipcode() {
+        String fromTopic = "transactions";
+        String toTopic = "spendbyzipcode-1";
+
+        if (log.isInfoEnabled()) {log.info("spendByZipcode stream started from {} to {}", fromTopic, toTopic);}
+
+        // Create Streams Config map. use `toTopic` suffix to differentiate consumer group
+        Properties streamsConfiguration = getStreamProperties(toTopic);
+
+        // Create collection with schema registry config for Serde object creation
+        final Map<String, String> serdeConfig = Collections.singletonMap(
+                AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
+
+        final Serde<String> stringAvroKeySerde = Serdes.String();
+        stringAvroKeySerde.configure(serdeConfig, true);
+
+        // Create GenericAvroSerde for use as key `isKey=true`
+        final Serde<GenericRecord> genericAvroKeySerde = new GenericAvroSerde();
+        genericAvroKeySerde.configure(serdeConfig, true);
+
+        // Create SpecificAvroSerde for use as value `isKey=false`
+        final Serde<SpecificRecord> transactionRequestValueSerde = new SpecificAvroSerde<SpecificRecord>();
+        transactionRequestValueSerde.configure(serdeConfig, false);
+
+        // Init StreamsBuilder `fromTopic`
+        StreamsBuilder streamsBuilder = new StreamsBuilder();
+        final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic, Consumed.with(stringAvroKeySerde, transactionRequestValueSerde));
 
         // Rekey with customer cardnumber and vendor location
         final KStream<GenericRecord, SpecificRecord> zipcodeRekey = stream.map(
@@ -296,27 +362,19 @@ public class FinCardSpendStream {
                 .windowedBy(TimeWindows.of(Duration.ofMinutes(5)).advanceBy(Duration.ofMinutes(1)))
                 .count();
 
-        // Count by key
-        //final KTable<GenericRecord, Long> countIs = groupedStream.count();
-
-        // Output the stream
-        // countIs.toStream().print(Printed.toSysOut());
-
         // Create stream
-        //KStream<GenericRecord, Long> countStream = countIs.toStream();
-        KStream<Windowed<GenericRecord>, Long> countStream = countIs.toStream().filter((key, count) -> count >= 3);
+        KStream<Windowed<GenericRecord>, Long> countStream = countIs.toStream().filter((key, count) -> count > 2);
 
         // Convert Long (count) to String
-        //KStream<GenericRecord, String> countStreamToPersist = countStream.mapValues(v -> v.toString());
-        KStream<GenericRecord, String> countStreamToPersist = countStream.map(
+        KTable<GenericRecord, String> countStreamToPersist = countStream.map(
                 (customerLocationByWindow, longCount) -> {
                     GenericRecord key = customerLocationByWindow.key();
                     return new KeyValue<>(key, longCount.toString());
-                }
-        );
+                })
+                .toTable(Materialized.with(genericAvroKeySerde, Serdes.String()));
 
         // Persist to `toTopic`
-        countStreamToPersist.to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
+        countStreamToPersist.toStream().to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
 
         return startStream(streamsBuilder, streamsConfiguration);
     }
@@ -471,6 +529,9 @@ public class FinCardSpendStream {
         final Map<String, String> serdeConfig = Collections.singletonMap(
                 AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
 
+        final Serde<String> stringAvroKeySerde = Serdes.String();
+        stringAvroKeySerde.configure(serdeConfig, true);
+
         // Create GenericAvroSerde for use as key `isKey=true`
         final Serde<GenericRecord> genericAvroKeySerde = new GenericAvroSerde();
         genericAvroKeySerde.configure(serdeConfig, true);
@@ -481,7 +542,7 @@ public class FinCardSpendStream {
 
         // Init StreamsBuilder `fromTopic`
         StreamsBuilder streamsBuilder = new StreamsBuilder();
-        final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic);
+        final KStream<String, SpecificRecord> stream = streamsBuilder.stream(fromTopic, Consumed.with(stringAvroKeySerde, transactionRequestSerde));;
 
         // Rekey with customer cardnumber and vendor location
         stream.map(
@@ -495,14 +556,24 @@ public class FinCardSpendStream {
                 })
                 // Group by the key
                 .groupByKey(Grouped.with(genericAvroKeySerde, transactionRequestSerde))
+                // Create 5 mins window
+                .windowedBy(TimeWindows.of(Duration.ofMinutes(5)).advanceBy(Duration.ofMinutes(1)))
                 // Count by key
                 .count()
+                // to a Stream to remove Windowed map reference
+                .toStream()
+                // filter if count > 2 i.e. more than 2 transactions by the customer from same location
+                .filter((key, count) -> count > 2)
+                .map(
+                        (customerLocationByWindow, longCount) -> {
+                            GenericRecord key = customerLocationByWindow.key();
+                            return new KeyValue<>(key, longCount.toString());
+                        })
+                .toTable(Materialized.with(genericAvroKeySerde, Serdes.String()))
                 // Create stream and convert Long (count) to String
                 .toStream()
-                .mapValues(v -> v.toString())
                 // Persist to the `toTopic`
                 .to(toTopic, Produced.with(genericAvroKeySerde, Serdes.String()));
-        ;
 
         return startStream(streamsBuilder, streamsConfiguration);
     }
@@ -518,7 +589,7 @@ public class FinCardSpendStream {
 
     }*/
 
-    private GenericData.Record mapObjectToRecord(Object object) {
+    public static GenericData.Record mapObjectToRecord(Object object) {
         Assert.notNull(object, "object must not be null");
         final Schema schema = ReflectData.get().getSchema(object.getClass());
         final GenericData.Record record = new GenericData.Record(schema);
@@ -526,7 +597,7 @@ public class FinCardSpendStream {
         return record;
     }
 
-    private <T> T mapRecordToObject(GenericData.Record record, T object) {
+    public static <T> T mapRecordToObject(GenericData.Record record, T object) {
         Assert.notNull(record, "record must not be null");
         Assert.notNull(object, "object must not be null");
         final Schema schema = ReflectData.get().getSchema(object.getClass());
