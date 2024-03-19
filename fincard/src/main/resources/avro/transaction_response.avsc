@@ -1,0 +1,21 @@
+{
+    "connect.name": "io.confluent.examples.fincard.transaction_response",
+    "type": "record",
+    "name": "TransactionResponse",
+    "namespace": "io.confluent.examples.fincard",
+    "fields": [
+        { "name": "id", "type": {"type": "string", "arg.properties": {"regex": "[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0=9][0-9][0-9][0-9]"}}},
+        { "name": "type", "type": {"type": "string", "arg.properties": {"regex": "[CREDIT,DEBIT,VOID]"}}},
+        { "name": "amount", "type": {"type": "double"}},
+        { "name": "currency", "type": {"type": "string", "arg.properties": {"regex": "USD"}}},
+        { "name": "customername", "type": {"type": "string", "arg.properties": {"regex": "FirstName_[0-9][0-9][0-9] LastName_[0-9][0-9][0-9]"}}},
+        { "name": "cardnumber", "type": {"type": "string", "arg.properties": {"regex": "410081699900[0-9][0-9][0-9][0-9]"}}},
+        { "name": "status", "type": {"type": "string", "arg.properties": {"regex": "[APPROVED,DENIED,OK,FAILED]"}}},
+        { "name": "reason", "type": {"type": "string", "arg.properties": {"regex": "No reason"}}},
+        { "name": "datetime", "type": {"type": "string"}},
+        { "name": "nonce", "type": {"type": "long", "arg.properties": {"iteration": { "start": 1, "step": 1}}}},
+        { "name": "creditlimit", "type": {"type": "double"}},
+        { "name": "creditlimitcurrency", "type": {"type": "string", "arg.properties": {"regex": "USD"}}},
+        { "name": "newbalance", "type": {"type": "double"}}
+    ]
+}

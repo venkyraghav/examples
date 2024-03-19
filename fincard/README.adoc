@@ -1,0 +1,65 @@
+// Directives
+:toc:
+:sectnums:
+
+:hardbreaks:
+
+= FinCard Application
+Venky Narayanan <vnarayanan@confluent.io>
+
+== Purpose
+
+. Capstone project for ACE bootcamp
+. Demonstrate
+.. Java coding ability
+.. Kafka concepts
+.. Schema concepts
+.. KSQL concepts
+.. Kafka streams concepts
+.. REST API
+.. Spring framework
+
+== Pre-requisites
+
+. Pre-requisites
+.. Execute `confluent local services start`
+... `bootstrap-server` running `localhost:9091`
+... `schema-registry` running `localhost:8081`
+.. Or Modify `gen_ref_data`
+. From `fincard/scripts` directory execute `gen_ref_data`
+. From `fincard` directory execute `mvn clean package`
+. TODO
+
+== How To Run
+
+. git clone this project
+. mvn clean package
+. mvn spring-boot:run
+. Test transaction
++
+----
+curl -X POST http://localhost:8080/fincard/transaction \
+   -H 'Content-Type: application/json' \
+   -d '{"type": "CREDIT","customername": "Customer Name","zipcode" : "30092", "amount": 10.0, "currency": "USD", "cardnumber" : "12345", "expdate": "00/1020", "pin": "0909", "vendorid": 13, "deviceid": 45, "datetime": "6789", "location": "30041", "nonce": 100101}'
+----
+
+== TODOs
+
+. Implement TODOs in the `TransactionService`
+. Script to generate data for Credit and Debit Transaction
+. KSQL queries
+. KStream application
+
+== DONEs
+
+. Base application scaffolding
+. Avro schema for customer reference data
+. Avro schema for vendor reference data
+. Script to generating reference data using ksql-datagen
+. Create Avro schemas for card transaction
+.. Credit Request
+.. Credit Response
+.. Debit Request
+.. Debit Response)
+. REST API for Credit transaction
+. REST API for Debit transaction

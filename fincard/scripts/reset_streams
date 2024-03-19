@@ -1,0 +1,11 @@
+#!/bin/bash
+topics=test2,transactions2,spendbyzipcode,transactions,transaction2
+
+kafka-streams-application-reset --bootstrap-servers localhost:9091 --application-id fincard-streams-copy --input-topics ${topics} --to-earliest
+kafka-streams-application-reset --bootstrap-servers localhost:9091 --application-id fincard-streams-zipcode --input-topics ${topics} --to-earliest
+kafka-streams-application-reset --bootstrap-servers localhost:9091 --application-id fincard-streams-spendbyzipcode-1 --input-topics ${topics} --to-earliest
+kafka-streams-application-reset --bootstrap-servers localhost:9091 --application-id fincard-streams-spendbyzipcode.concise --input-topics ${topics} --to-earliest
+kafka-streams-application-reset --bootstrap-servers localhost:9091 --application-id fincard-streams-spendbyamountlocation --input-topics ${topics} --to-earliest
+kafka-streams-application-reset --bootstrap-servers localhost:9091 --application-id fincard-streams-different --input-topics ${topics} --to-earliest
+kafka-topics --bootstrap-server localhost:9091 --delete --topic spendbyzipcode
+kafka-topics --bootstrap-server localhost:9091 --delete --topic transaction2

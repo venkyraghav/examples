@@ -1,0 +1,6 @@
+# !/bin/bash
+echo "Generating customer reference data ..."
+ksql-datagen bootstrap-server=localhost:9091 schema=../src/main/resources/avro/customer.avsc key-format=avro value-format=avro topic=customer key=id iterations=100000 nThreads=2 msgRate=200 printRows=false
+
+echo "Generating Vendor reference data ..."
+ksql-datagen bootstrap-server=localhost:9091 schema=../src/main/resources/avro/vendor.avsc key-format=avro value-format=avro topic=vendor key=id iterations=5000 nThreads=2 msgRate=20 printRows=true

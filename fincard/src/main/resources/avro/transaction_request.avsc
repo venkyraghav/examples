@@ -1,0 +1,21 @@
+{
+    "connect.name": "io.confluent.examples.fincard.transaction_request",
+    "type": "record",
+    "name": "TransactionRequest",
+    "namespace": "io.confluent.examples.fincard",
+    "fields": [
+        { "name": "type", "type": {"type": "string", "arg.properties": {"regex": "[CREDIT,DEBIT,VOID]"}}},
+        { "name": "amount", "type": {"type": "double","arg.properties": {"iteration": { "start": 100, "step": 500}}}},
+        { "name": "currency", "type": {"type": "string", "arg.properties": {"regex": "USD"}}},
+        { "name": "customername", "type": {"type": "string", "arg.properties": {"regex": "FirstName_[0-9][0-9][0-9] LastName_[0-9][0-9][0-9]"}}},
+        { "name": "zipcode", "type": {"type": "string", "arg.properties": {"regex": "30[0-9][0-9][0-9]"}}},
+        { "name": "cardnumber", "type": {"type": "string", "arg.properties": {"regex": "41008169990000[0-9][0-9]"}}},
+        { "name": "expdate", "type": {"type": "string", "arg.properties": {"regex": "[1-9]/20[0-9][0-9]"}}},
+        { "name": "pin", "type": {"type": "string", "arg.properties": {"regex": "[0-9][0-9][0-9][0-9]"}}},
+        { "name": "vendorid", "type": {"type": "long", "arg.properties": {"iteration": { "start": 1000000, "step": 100}}}},
+        { "name": "deviceid", "type": {"type": "long", "arg.properties": {"iteration": { "start": 1, "step": 200}}}},
+        { "name": "datetime", "type": {"type": "string"}},
+        { "name": "location", "type": {"type": "string", "arg.properties": {"regex": "30[0-9][0-9][0-9]"}}},
+        { "name": "nonce", "type": {"type": "long", "arg.properties": {"iteration": { "start": 1, "step": 1}}}}
+    ]
+}

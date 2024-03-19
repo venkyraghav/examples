@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "glib.h": "c",
+        "rdkafka.h": "c"
+    }
+}
