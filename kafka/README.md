@@ -34,8 +34,6 @@ client uses `rd_kafka_assign` to subscribe to topic and parition(s)
 
 ### Reference
 
-https://videos.confluent.io/watch/83MyNfBDTqJxt9dx2d7TPo?
-
 https://www.confluent.io/blog/dynamic-vs-static-kafka-consumer-rebalancing/
 
 https://www.confluent.io/kafka-summit-san-francisco-2019/static-membership-rebalance-strategy-designed-for-the-cloud/
