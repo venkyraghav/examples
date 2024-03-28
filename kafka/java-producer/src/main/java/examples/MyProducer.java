@@ -9,17 +9,34 @@ import java.util.*;
 public class MyProducer {
 
     public static void main(final String[] args) throws IOException {
-        if (args.length != 1) {
+        if (args.length < 2) {
             System.out.println("Please provide the configuration file path as a command line argument");
             System.exit(1);
+        }
+        boolean isTransactional = false;
+        if (args.length == 2) {
+            isTransactional = true;
         }
 
         // Load producer configuration settings from a local file
         final Properties props = loadConfig(args[0]);
-        final String topic = "purchases";
         props.forEach(
             (k,v) -> { System.out.println("Key=" + k + ", Value=" + v);}
         );
+
+        if (isTransactional) {
+            transactionalProducer(props);
+        } else {
+            simpleProducer(props);
+        }
+    }
+
+    public static void transactionalProducer(Properties props) {
+        System.out.println("TODO Transactional Producer");
+    }
+
+    public static void simpleProducer(Properties props) {
+        final String topic = "purchases";
 
         String[] users = {"eabara", "jsmith", "sgarcia", "jbernard", "htanaka", "awalther"};
         String[] items = {"book", "alarm clock", "t-shirts", "gift card", "batteries"};
@@ -41,7 +58,6 @@ public class MyProducer {
             }
             System.out.printf("%s events were produced to topic %s%n", numMessages, topic);
         }
-
     }
 
     // We'll reuse this function to load properties from the Consumer as well
