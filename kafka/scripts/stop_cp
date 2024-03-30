@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# Main function
+main() {
+    source ${base_dir}/common
+    MyEcho "WARN" "TODO Does not identify contoller (to be killed last)"
+
+    for pidtype in `echo AK ZK`
+    do
+        num=`ps -ef|grep ${ENV_NAME} |grep "node=${pidtype}" |grep -v grep |awk '{print $2}'|wc -l`
+        if [[ ${num} -gt 0 ]]; then
+            MyEcho "INFO" "Start kill all ${pidtype} ..."
+            while [[ ${num} -gt 0 ]]; do
+                for pid in `ps -ef|grep ${ENV_NAME} |grep "node=${pidtype}" |grep -v grep |awk '{print $2}'`
+                do
+                    MyEcho "INFO" "Kill ${pidtype} PID ${pid}"
+                    kill ${pid}
+                    sleep 5
+                done
+                num=`ps -ef|grep ${ENV_NAME} |grep "node=${pidtype}" |grep -v grep |awk '{print $2}'|wc -l`
+            done
+            MyEcho "INFO" "Done kill all ${pidtype} ..."
+        else
+            MyEcho "INFO" "No ${pidtype} to kill..."
+        fi
+    done
+
+    # num=`ps -ef|grep ${ENV_NAME} |grep "node=AK" |grep -v grep |awk '{print $2}'|wc -l`
+    # if [[ ${num} -gt 0 ]]; then
+    #     MyEcho "INFO" "Start kill all Brokers ..."
+    #     while [[ ${num} -gt 0 ]]; do
+    #         for pid in `ps -ef|grep VENKY.LOCAL |grep "node=AK" |grep -v grep |awk '{print $2}'`
+    #         do
+    #             MyEcho "INFO" "Kill Broker PID ${pid}"
+    #             kill ${pid}
+    #             sleep 5
+    #         done
+    #         num=`ps -ef|grep VENKY.LOCAL |grep "node=AK" |grep -v grep |awk '{print $2}'|wc -l`
+    #     done
+    #     MyEcho "INFO" "Done kill all Brokers ..."
+    # else
+    #     MyEcho "INFO" "No Brokers to kill..."
+    # fi
+
+    # num=`ps -ef|grep VENKY.LOCAL |grep "node=ZK" |grep -v grep |awk '{print $2}'|wc -l`
+    # if [[ ${num} -gt 0 ]]; then
+    #     MyEcho "INFO" "Start kill all ZKs ..."
+    #     while [[ ${num} -gt 0 ]]; do
+    #         for pid in `ps -ef|grep VENKY.LOCAL |grep "node=ZK" |grep -v grep |awk '{print $2}'`
+    #         do
+    #             MyEcho "INFO" "Kill ZK PID ${pid}"
+    #             kill ${pid}
+    #             sleep 5
+    #         done
+    #         num=`ps -ef|grep VENKY.LOCAL |grep "node=ZK" |grep -v grep |awk '{print $2}'|wc -l`
+    #     done
+    #     MyEcho "INFO" "Done kill all ZKs ..."
+    # else
+    #     MyEcho "INFO" "No ZKs to kill..."
+    # fi
+}
+
+######################################################################
+# Main Processing Starts Here
+######################################################################
+base_dir=$(dirname $0)
+main $@
