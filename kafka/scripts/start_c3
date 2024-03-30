@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# export CONTROL_CENTER_LOG4J_OPTS="-Dkafka.logs.dir=/Users/venky/_official/cp/data/logs -Dlog4j.configuration=file:///Users/venky/_official/cp/config/genconfig/log4j_zk.properties"
+
+export CONTROL_CENTER_OPTS="-DVENKY.LOCAL -Dnode=C3"
+# CONTROL_CENTER_JMX_OPTS="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+# CONTROL_CENTER_JMX_OPTS="${CONTROL_CENTER_JMX_OPTS} -javaagent:/Users/venky/_official/config/kafka/jolokia-jvm.jar=config=/Users/venky/_official/config/kafka/zk_jolokia.properties"
+# CONTROL_CENTER_JMX_OPTS="${CONTROL_CENTER_JMX_OPTS} -javaagent:/Users/venky/_official/config/kafka/jmx_prometheus_javaagent-0.16.1.jar=8080:/Users/venky/github.com/confluentinc/jmx-monitoring-stacks/shared-assets/jmx-exporter/zookeeper.yml"
+# CONTROL_CENTER_JMX_OPTS="-Djava.net.preferIPv4Stack=true"
+# export CONTROL_CENTER_JMX_OPTS
+control-center-start /Users/venky/_official/cp/script/control-center.properties

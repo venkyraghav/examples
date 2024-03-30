@@ -1,0 +1,117 @@
+#!/bin/bash
+
+MyEcho() {
+    echo [`date +"%Y-%m-%d %H:%M:%S"`] $1 $2
+}
+
+
+RunJ2() {
+    if [[ ! -f $1 ]]; then
+        MyEcho "ERROR" "$1 does not exist"
+        exit 1
+    fi
+    if [[ -f $2 ]]; then
+        MyEcho "WARN" "$2 exist. Overwriting ..."
+    fi
+    j2 $1 > $2
+}
+
+CheckOrCreateDir() {
+    DIR=$1
+    mkdir -p ${DIR}
+    echo ${DIR}
+}
+
+AbsPath() {
+    cd "$(dirname "$1")"
+    printf "%s/%s\n" "$(pwd)" "$(basename "$1")"
+    cd "$OLDPWD"
+}
+
+Precheck() {
+    ABSPATH=$( AbsPath ${base_dir} )
+    JAR_DIR=$( CheckOrCreateDir ${ABSPATH}/jar )
+    GEN_DIR=$( CheckOrCreateDir ${ABSPATH}/generated )
+    CFG_DIR=$( CheckOrCreateDir ${GEN_DIR}/config )
+    export DATA_DIR=$( CheckOrCreateDir ${GEN_DIR}/data )
+    export LOG_DIR=$( CheckOrCreateDir ${GEN_DIR}/logs )
+    J2_DIR=${ABSPATH}/j2
+
+    if [[ ! -d ${CONFLUENT_HOME} ]] ; then
+        MyEcho "ERROR" "CONFLUENT_HOME is not set"
+        exit 1
+    fi
+    if [[ ! -d ${JAVA_HOME} ]] ; then
+        MyEcho "ERROR" "JAVA_HOME is not set"
+        exit 1
+    fi
+    
+    if [[ ! -d ${J2_DIR} ]] ; then
+        MyEcho "ERROR" "J2_DIR ${J2_DIR} is not set"
+        exit 1
+    fi
+    PROP_DIR=${ABSPATH}/prop
+    if [[ ! -d ${PROP_DIR} ]] ; then
+        MyEcho "ERROR" "PROP_DIR ${PROP_DIR} is not set"
+        exit 1
+    fi
+
+    if [[ ! -x $(which kafka-server-start) ]] ; then
+        MyEcho "ERROR" "kafka-server-start is not in path"
+        exit 1
+    fi
+    if [[ ! -x $(which zookeeper-server-start) ]] ; then
+        MyEcho "ERROR" "zookeeper-server-start is not in path"
+        exit 1
+    fi
+
+    if [[ ! -x $(which wget) ]] ; then
+        MyEcho "ERROR" "wget is not installed"
+        exit 1
+    fi
+    if [[ ! -x $(which j2) ]] ; then
+        MyEcho "ERROR" "j2 is not installed"
+        exit 1
+    fi
+
+    JOLOKIA_JAR=${JAR_DIR}/jolokia-jvm-1.6.2-agent.jar
+    if [[ ! -f ${JOLOKIA_JAR} ]] ; then
+        wget https://repo1.maven.org/maven2/org/jolokia/jolokia-jvm/1.6.2/jolokia-jvm-1.6.2-agent.jar -P ${JAR_DIR}/
+    fi
+    JMX_PROM_JAR=${JAR_DIR}/jmx_prometheus_javaagent-0.16.1.jar
+    if [[ ! -f ${JMX_PROM_JAR} ]] ; then
+        wget https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.16.1/jmx_prometheus_javaagent-0.16.1.jar -P ${JAR_DIR}/
+    fi
+
+    if [[ ! -f ${PROP_DIR}/kafka_broker.yml ]] ; then
+        MyEcho "ERROR" "${PROP_DIR}/kafka_broker.yml does not exist"
+        exit 1
+    fi
+
+    if [[ ! -f ${PROP_DIR}/zookeeper.yml ]] ; then
+        MyEcho "ERROR" "${PROP_DIR}/zookeeper.yml does not exist"
+        exit 1
+    fi
+
+    if [[ ! -f ${J2_DIR}/zookeeper.properties.j2 ]] ; then
+        MyEcho "ERROR" "${J2_DIR}/zookeeper.properties.j2 does not exist"
+        exit 1
+    fi
+
+    if [[ ! -f ${J2_DIR}/server.properties.j2 ]] ; then
+        MyEcho "ERROR" "${J2_DIR}/server.properties.j2 does not exist"
+        exit 1
+    fi
+    if [[ ! -f ${J2_DIR}/server-rbac.properties.j2 ]] ; then
+        MyEcho "ERROR" "${J2_DIR}/server-rbac.properties.j2 does not exist"
+        exit 1
+    fi
+    if [[ ! -f ${J2_DIR}/jolokia.properties.j2 ]] ; then
+        MyEcho "ERROR" "${J2_DIR}/jolokia.properties.j2 does not exist"
+        exit 1
+    fi
+    if [[ ! -f ${J2_DIR}/log4j.properties.j2 ]] ; then
+        MyEcho "ERROR" "${J2_DIR}/log4j.properties.j2 does not exist"
+        exit 1
+    fi
+}

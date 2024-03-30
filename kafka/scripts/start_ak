@@ -1,0 +1,234 @@
+#!/bin/bash
+
+# Usage
+Usage() {
+  echo "Usage: ${PROG_NAME} "
+  echo "  -b|--broker-id: broker id (default: 0)"
+  echo "  -d|--dc-id: data center id (default: 1)"
+  echo "  -r|--replication-factor: replication factor (default: 1)"
+  echo "  -m|--min-isr: min isr (default: 1)"
+  echo "  -R|--rbac: enable rbac (default: false)"
+  echo "  -H|--health-plus: enable health+ (default: false)"
+  echo "  -n|--nohup: run in background (default: false)"
+  echo "  -h|--help: print help"
+}
+
+# Validate
+Validate() {
+    if [[ ${BROKER_ID} -lt 0 ]] ; then
+        MyEcho "ERROR" "broker id must be greater than 0"
+        Usage
+        exit 1
+    fi
+    if [[ ${REPLICATION_FACTOR} -lt ${MIN_ISR} ]] ; then
+        MyEcho "ERROR" "replication factor must be greater than or equal to min isr"
+        Usage
+        exit 1
+    fi
+}
+
+# Export vars
+ExportVars() {
+    export MY_IP=$(ifconfig en0 | grep inet | awk '$1=="inet" {print $2}')
+    export ZK_PORT=2181
+
+    export ID=${BROKER_ID}
+    CONFLUENT_HTTP_SERVER_LISTENERS=8090
+    export CONFLUENT_HTTP_SERVER_LISTENERS=$(( CONFLUENT_HTTP_SERVER_LISTENERS + BROKER_ID ))
+
+    JMX_PORT=18080
+    export JMX_PORT=$(( JMX_PORT + BROKER_ID ))
+
+    JOLOKIA_PORT=17770
+    export JOLOKIA_PORT=$(( JOLOKIA_PORT + BROKER_ID ))
+
+    ########################################################################################################
+    # BROKER_ID | LISTENERS_PORT | EXTERNAL_PORT | REPLICATION_PORT | TOKEN_PORT | JOLOKIA_PORT | JMX_PORT
+    ########################################################################################################
+    # 1         | 9091           | 9191          | 9291             | 9391       | 17771        | 18081
+    # 2         | 9092           | 9192          | 9292             | 9392       | 17772        | 18082
+    # 3         | 9093           | 9193          | 9293             | 9393       | 17773        | 18083
+
+    LISTENERS_PORT=9090
+    export LISTENERS_PORT=$(( LISTENERS_PORT + BROKER_ID ))
+    if [[ ${RBAC_ENABLED} -eq 1 ]] ; then
+        export EXTERNAL_PORT=$(( LISTENERS_PORT + 100 ))
+        export REPLICATION_PORT=$(( LISTENERS_PORT + 200 ))
+        export TOKEN_PORT=$(( LISTENERS_PORT + 300 ))
+    fi
+
+    export KAFKA_OPTS="-DVENKY.LOCAL -Dnode=AK${BROKER_ID}"
+
+    KAFKA_JMX_OPTS="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.host=${MY_IP} -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+    KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS} -Djava.rmi.server.hostname=${MY_IP}"
+    KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS} -Djava.net.preferIPv4Stack=true"
+    KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS} -javaagent:${JAR_DIR}/jolokia-jvm-1.6.2-agent.jar=config=${CFG_DIR}/kafka_jolokia_${BROKER_ID}.properties"
+    KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS} -javaagent:${JAR_DIR}/jmx_prometheus_javaagent-0.16.1.jar=${JMX_PORT}:${PROP_DIR}/kafka_broker.yml"
+    export KAFKA_JMX_OPTS
+    #export KAFKA_JMX_OPTS="-Djava.net.preferIPv4Stack=true"
+    MyEcho "INFO" "KAFKA_JMX_OPTS=${KAFKA_JMX_OPTS}"
+
+    KAFKA_LOG4J_OPTS="-Dlog4j.configuration=file://${CFG_DIR}/log4j_${BROKER_ID}.properties"
+    export KAFKA_LOG4J_OPTS
+}
+
+# Echo vars
+EchoVars() {
+    echo ""
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "Begin All Vars"
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "PROG_NAME="${PROG_NAME}
+    MyEcho "INFO" "BROKER_ID="${BROKER_ID}
+    MyEcho "INFO" "ID="${ID}
+    MyEcho "INFO" "DC_ID="${DC_ID}
+    MyEcho "INFO" "REPLICATION_FACTOR="${REPLICATION_FACTOR}
+    MyEcho "INFO" "MIN_ISR="${MIN_ISR}
+
+    MyEcho "INFO" "ZK_PORT="${ZK_PORT}
+    MyEcho "INFO" "CONFLUENT_HTTP_SERVER_LISTENERS="${CONFLUENT_HTTP_SERVER_LISTENERS}
+    MyEcho "INFO" "JOLOKIA_PORT="${JOLOKIA_PORT}
+    MyEcho "INFO" "JMX_PORT="${JMX_PORT}
+    MyEcho "INFO" "LISTENERS_PORT="${LISTENERS_PORT}
+    if [[ ${RBAC_ENABLED} -eq 1 ]] ; then
+        MyEcho "INFO" "EXTERNAL_PORT="${EXTERNAL_PORT}
+        MyEcho "INFO" "REPLICATION_PORT="${REPLICATION_PORT}
+        MyEcho "INFO" "TOKEN_PORT="${TOKEN_PORT}
+    fi
+
+    MyEcho "INFO" "KAFKA_OPTS="${KAFKA_OPTS}
+    # MyEcho "INFO" "KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS}
+    MyEcho "INFO" "KAFKA_LOG4J_OPTS="${KAFKA_LOG4J_OPTS}
+
+    MyEcho "INFO" "LOG_DIR="${LOG_DIR}
+    MyEcho "INFO" "DATA_DIR="${DATA_DIR}
+    MyEcho "INFO" "CFG_DIR="${CFG_DIR}
+    MyEcho "INFO" "JAR_DIR="${JAR_DIR}
+    MyEcho "INFO" "PROP_DIR="${PROP_DIR}
+    MyEcho "INFO" "RBAC_ENABLED="${RBAC_ENABLED}
+    MyEcho "INFO" "HEALTHPLUS_ENABLED="${HEALTHPLUS_ENABLED}
+    MyEcho "INFO" "NOHUP="${NOHUP}
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "End All Vars"
+    MyEcho "INFO" "####################"
+    echo ""
+    echo ""
+}
+
+# Generate properties
+GenerateProperties() {
+    if [[ ${RBAC_ENABLED} -eq 1 ]] ; then
+        RunJ2 ${J2_DIR}/server-rbac.properties.j2 ${CFG_DIR}/server_rbac_${BROKER_ID}.properties
+    else
+        RunJ2 ${J2_DIR}/server.properties.j2 ${CFG_DIR}/server_${BROKER_ID}.properties
+    fi
+    RunJ2 ${J2_DIR}/jolokia.properties.j2 ${CFG_DIR}/kafka_jolokia_${BROKER_ID}.properties
+    RunJ2 ${J2_DIR}/log4j.properties.j2 ${CFG_DIR}/log4j_${BROKER_ID}.properties
+}
+
+# Process args
+ProcessArgs() {
+    POSITIONAL_ARGS=()
+
+    export DC_ID=1
+    export RBAC_ENABLED=0
+    export REPLICATION_FACTOR=1
+    export BROKER_ID=0
+    export MIN_ISR=1
+    export NOHUP=0
+    export HEALTHPLUS_ENABLED=0
+
+    export PROG_NAME=$0
+    if [[ $# -eq 0 ]]; then
+        return
+    fi
+
+    while [[ $# -gt 0 ]]; do
+    case $1 in
+        -b|--broker-id)
+        export BROKER_ID="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -d|--dc-id)
+        export DC_ID="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -r|--replication-factor)
+        export REPLICATION_FACTOR="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -m|--min-isr)
+        export MIN_ISR="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -R|--rbac)
+        export RBAC_ENABLED=1
+        shift # past argument
+        ;;
+        -H|--health-plus)
+        export HEALTHPLUS_ENABLED=1
+        shift # past argument
+        ;;
+        -n|--nohup)
+        export NOHUP=1
+        shift # past argument
+        ;;
+        -h|--help)
+        MyEcho "INFO" "Printing help"
+        Usage
+        exit 0
+        ;;
+        -*|--*)
+        MyEcho "ERROR" "Unknown option $1"
+        Usage
+        exit 1
+        ;;
+        *)
+        POSITIONAL_ARGS+=("$1") # save positional arg
+        shift # past argument
+        ;;
+    esac
+    done
+
+    set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+}
+
+# Main function
+main() {
+    source ${base_dir}/common
+    Precheck
+    ProcessArgs $@
+    ExportVars
+    Validate
+    EchoVars
+    GenerateProperties
+    if [[ ${RBAC_ENABLED} -eq 1 ]] ; then
+        MyEcho "INFO" "Starting broker ${BROKER_ID} with ${CFG_DIR}/server_rbac_${BROKER_ID}.properties ..."
+        if [[ ${NOHUP} -eq 1 ]] ; then
+            MyEcho "INFO" "nohup ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_rbac_${BROKER_ID}.properties 2>&1 > ${LOG_DIR}/ak_${BROKER_ID}.log &"
+            nohup ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_rbac_${BROKER_ID}.properties 2>&1 > ${LOG_DIR}/ak_${BROKER_ID}.log &
+        else
+            MyEcho "INFO" "${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_rbac_${BROKER_ID}.properties"
+            ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_rbac_${BROKER_ID}.properties
+        fi
+    else
+        MyEcho "INFO" "Starting broker ${BROKER_ID} with ${CFG_DIR}/server_${BROKER_ID}.properties ..."
+        if [[ ${NOHUP} -eq 1 ]] ; then
+            MyEcho "INFO" "nohup ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${BROKER_ID}.properties 2>&1 > ${LOG_DIR}/ak_${BROKER_ID}.log &"
+            nohup ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${BROKER_ID}.properties 2>&1 > ${LOG_DIR}/ak_${BROKER_ID}.log &
+        else
+            MyEcho "INFO" "${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${BROKER_ID}.properties"
+            ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${BROKER_ID}.properties
+        fi
+    fi
+}
+
+######################################################################
+# Main Processing Starts Here
+######################################################################
+base_dir=$(dirname $0)
+main $@

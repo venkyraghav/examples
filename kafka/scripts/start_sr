@@ -1,0 +1,256 @@
+#!/bin/bash
+
+# Usage
+Usage() {
+  echo "Usage: ${PROG_NAME} "
+  echo "  -b|--bootstrap-server: bootstrap server (default: localhost:9092)"
+  echo "  -i|--sr-id: port (default: 0)"
+  echo "  -n|--nohup: run in background (default: false)"
+  echo "  -h|--help: print help"
+}
+
+MyEcho() {
+    echo [`date +"%Y-%m-%d %H:%M:%S"`] $1 $2
+}
+
+# Validate
+Validate() {
+    if [[ ! -x $(which j2) ]] ; then
+        MyEcho "ERROR" "j2 is not installed"
+        exit 1
+    fi
+    if [[ ! -d ${CONFLUENT_HOME} ]] ; then
+        MyEcho "ERROR" "CONFLUENT_HOME is not set"
+        exit 1
+    fi
+    if [[ ! -d ${JAVA_HOME} ]] ; then
+        MyEcho "ERROR" "JAVA_HOME is not set"
+        exit 1
+    fi
+    if [[ ! -x $(which kafka-server-start) ]] ; then
+        MyEcho "ERROR" "kafka-server-start is not in path"
+        exit 1
+    fi
+
+    if [[ ! -f ${JOLOKIA_ASSETS_DIR}/jolokia-jvm-1.6.2-agent.jar ]] ; then
+        MyEcho "ERROR" "${JOLOKIA_ASSETS_DIR}/jolokia-jvm-1.6.2-agent.jar does not exist"
+        exit 1
+    fi
+
+    if [[ ! -f ${SHARED_ASSETS_DIR}/jmx_prometheus_javaagent-0.16.1.jar ]] ; then
+        MyEcho "ERROR" "${SHARED_ASSETS_DIR}/jmx_prometheus_javaagent-0.16.1.jar does not exist"
+        exit 1
+    fi
+    if [[ ! -f ${SHARED_ASSETS_DIR}/confluent_schemaregistry.yml ]] ; then
+        MyEcho "ERROR" "${SHARED_ASSETS_DIR}/kafka_broker.yml does not exist"
+        exit 1
+    fi
+
+    if [[ ! -f ${CP_DIR}/script/schema-registry.properties.j2 ]] ; then
+        MyEcho "ERROR" "${CP_DIR}/script/server.properties.j2 does not exist"
+        exit 1
+    fi
+    if [[ ! -f ${CP_DIR}/script/schema-registry-rbac.properties.j2 ]] ; then
+        MyEcho "ERROR" "${CP_DIR}/script/schema-registry-rbac.properties.j2 does not exist"
+        exit 1
+    fi
+    if [[ ! -f ${CP_DIR}/script/jolokia.properties.j2 ]] ; then
+        MyEcho "ERROR" "${CP_DIR}/script/jolokia.properties.j2 does not exist"
+        exit 1
+    fi
+    if [[ ! -f ${CP_DIR}/script/log4j.properties.j2 ]] ; then
+        MyEcho "ERROR" "${CP_DIR}/script/log4j.properties.j2 does not exist"
+        exit 1
+    fi
+    if [[ ${SR_ID} -lt 0 ]] ; then
+        MyEcho "ERROR" "schema registry id must be greater than 0"
+        Usage
+        exit 1
+    fi
+    if [[ -z ${BOOTSTRAP_SERVERS} ]] ; then
+        MyEcho "ERROR" "bootstrap server is required"
+        Usage
+        exit 1
+    fi
+}
+
+# Export vars
+ExportVars() {
+    export CP_DIR=${HOME}/_official/cp
+    export CFG_DIR=${CP_DIR}/config
+    export GEN_CFG_DIR=${CP_DIR}/genconfig
+    export DATA_DIR=${CP_DIR}/data
+    export LOG_DIR="${DATA_DIR}/logs"
+    mkdir -p ${LOG_DIR}
+
+    export JMX_MONITORING_STACKS_DIR=${HOME}/github.com/confluentinc/jmx-monitoring-stacks
+    export JOLOKIA_ASSETS_DIR=${JMX_MONITORING_STACKS_DIR}/jolokia-elastic-kibana/assets/
+    export SHARED_ASSETS_DIR=${JMX_MONITORING_STACKS_DIR}/shared-assets/jmx-exporter
+
+    export ID=${SR_ID}
+
+    JMX_PORT=18180
+    export JMX_PORT=$(( JMX_PORT + SR_ID ))
+
+    JOLOKIA_PORT=17870
+    export JOLOKIA_PORT=$(( JOLOKIA_PORT + SR_ID ))
+
+    LISTENERS_PORT=8081
+    OFFSET=$(( 100 * SR_ID ))
+    export LISTENERS_PORT=$(( LISTENERS_PORT + OFFSET ))
+    if [[ ${RBAC_ENABLED} -eq 1 ]] ; then
+       echo "RBAC_ENABLED="${RBAC_ENABLED}
+    fi
+
+    export SCHEMA_REGISTRY_OPTS="-DVENKY.LOCAL -Dnode=SR${SR_ID}"
+
+    SCHEMA_REGISTRY_JMX_OPTS="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+    SCHEMA_REGISTRY_JMX_OPTS="${SCHEMA_REGISTRY_JMX_OPTS} -javaagent:${JOLOKIA_ASSETS_DIR}/jolokia-jvm-1.6.2-agent.jar=config=${GEN_CFG_DIR}/schema-registry_jolokia_${SR_ID}.properties"
+    SCHEMA_REGISTRY_JMX_OPTS="${SCHEMA_REGISTRY_JMX_OPTS} -javaagent:${SHARED_ASSETS_DIR}/jmx_prometheus_javaagent-0.16.1.jar=${JMX_PORT}:${SHARED_ASSETS_DIR}/confluent_schemaregistry.yml"
+    export SCHEMA_REGISTRY_JMX_OPTS
+
+    SCHEMA_REGISTRY_LOG4J_OPTS="-Dlog4j.configuration=file://${GEN_CFG_DIR}/log4j_sr_${SR_ID}.properties"
+    export KAFKA_LOG4J_OPTS
+    if [[ ${NOHUP} -eq 1 ]] ; then
+        export PROCESS_PREFIX="nohup "
+        export PROCESS_SUFFIX=" 2>&1 > /dev/null &"
+    fi
+}
+
+# Echo vars
+EchoVars() {
+    echo ""
+    echo ""
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "Begin All Vars"
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "PROG_NAME="${PROG_NAME}
+    MyEcho "INFO" "SR_ID="${SR_ID}
+    MyEcho "INFO" "ID="${ID}
+    MyEcho "INFO" "BOOTSTRAP_SERVERS="${BOOTSTRAP_SERVERS}
+
+    MyEcho "INFO" "JOLOKIA_PORT="${JOLOKIA_PORT}
+    MyEcho "INFO" "JMX_PORT="${JMX_PORT}
+    MyEcho "INFO" "LISTENERS_PORT="${LISTENERS_PORT}
+    if [[ ${RBAC_ENABLED} -eq 1 ]] ; then
+        echo "RBAC_ENABLED="${RBAC_ENABLED}
+    fi
+
+    MyEcho "INFO" "SCHEMA_REGISTRY_OPTS="${SCHEMA_REGISTRY_OPTS}
+    MyEcho "INFO" "SCHEMA_REGISTRY_JMX_OPTS="${SCHEMA_REGISTRY_JMX_OPTS}
+    MyEcho "INFO" "SCHEMA_REGISTRY_LOG4J_OPTS="${SCHEMA_REGISTRY_LOG4J_OPTS}
+
+    MyEcho "INFO" "LOG_DIR="${LOG_DIR}
+    MyEcho "INFO" "DATA_DIR="${DATA_DIR}
+    MyEcho "INFO" "CP_DIR="${CP_DIR}
+    MyEcho "INFO" "CFG_DIR="${CFG_DIR}
+    MyEcho "INFO" "GEN_CFG_DIR="${GEN_CFG_DIR}
+    MyEcho "INFO" "JMX_MONITORING_STACKS_DIR="${JMX_MONITORING_STACKS_DIR}
+    MyEcho "INFO" "JOLOKIA_ASSETS_DIR="${JOLOKIA_ASSETS_DIR}
+    MyEcho "INFO" "SHARED_ASSETS_DIR="${SHARED_ASSETS_DIR}
+    MyEcho "INFO" "RBAC_ENABLED="${RBAC_ENABLED}
+    MyEcho "INFO" "NOHUP="${NOHUP}
+    MyEcho "INFO" "PROCESS_PREFIX=${PROCESS_PREFIX}"
+    MyEcho "INFO" "PROCESS_SUFFIX=${PROCESS_SUFFIX}"
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "End All Vars"
+    MyEcho "INFO" "####################"
+    echo ""
+    echo ""
+}
+
+RunJ2() {
+    if [[ ! -f $1 ]]; then
+        MyEcho "ERROR" "$1 does not exist"
+        Usage
+        exit 1
+    fi
+    if [[ -f $2 ]]; then
+        MyEcho "WARN" "$2 exist. Overwriting ..."
+    fi
+    j2 $1 > $2
+}
+
+# Generate properties
+GenerateProperties() {
+    if [[ ${RBAC_ENABLED} -eq 1 ]] ; then
+        RunJ2 ${CP_DIR}/script/schema-registry-rbac.properties.j2 ${GEN_CFG_DIR}/schema-registry_rbac_${SR_ID}.properties
+    else
+        RunJ2 ${CP_DIR}/script/schema-registry.properties.j2 ${GEN_CFG_DIR}/schema-registry_${SR_ID}.properties
+    fi
+    RunJ2 ${CP_DIR}/script/jolokia.properties.j2 ${GEN_CFG_DIR}/schema-registry_jolokia_${SR_ID}.properties
+    RunJ2 ${CP_DIR}/script/log4j.properties.j2 ${GEN_CFG_DIR}/log4j_sr_${SR_ID}.properties
+}
+
+# Process args
+ProcessArgs() {
+    POSITIONAL_ARGS=()
+
+    export SR_ID=0
+    export BOOTSTRAP_SERVERS="localhost:9092"
+    export RBAC_ENABLED=0
+    export NOHUP=0
+
+    export PROG_NAME=$0
+    if [[ $# -eq 0 ]]; then
+        return
+    fi
+
+    while [[ $# -gt 0 ]]; do
+    case $1 in
+        -b|--bootstrap-server)
+        export BOOTSTRAP_SERVERS="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -i|sr-id)
+        export SR_ID="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -n|--nohup)
+        export NOHUP=1
+        shift # past argument
+        ;;
+        -h|--help)
+        MyEcho "INFO" "Printing help"
+        Usage
+        exit 0
+        ;;
+        -*|--*)
+        MyEcho "ERROR" "Unknown option $1"
+        Usage
+        exit 1
+        ;;
+        *)
+        POSITIONAL_ARGS+=("$1") # save positional arg
+        shift # past argument
+        ;;
+    esac
+    done
+
+    set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+}
+
+# Main function
+main() {
+    ProcessArgs $@
+    ExportVars
+    Validate
+    EchoVars
+    GenerateProperties
+    if [[ ${RBAC_ENABLED} -eq 1 ]] ; then
+        MyEcho "INFO" "Starting broker ${SR_ID} with ${GEN_CFG_DIR}/schema-registry-rbac_${SR_ID}.properties ..."
+        exit 0
+        ${PROCESS_PREFIX} ${CONFLUENT_HOME}/bin/kafka-server-start ${GEN_CFG_DIR}/schema-registry-rbac_${SR_ID}.properties ${PROCESS_SUFFIX}
+    else
+        MyEcho "INFO" "Starting broker ${SR_ID} with ${GEN_CFG_DIR}/schema-registry_${SR_ID}.properties ..."
+        exit 0
+        ${PROCESS_PREFIX} ${CONFLUENT_HOME}/bin/kafka-server-start ${GEN_CFG_DIR}/schema-registry_${SR_ID}.properties ${PROCESS_SUFFIX}
+    fi
+}
+
+######################################################################
+# Main Processing Starts Here
+######################################################################
+main $@

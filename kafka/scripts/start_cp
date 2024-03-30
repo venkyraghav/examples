@@ -1,0 +1,190 @@
+#!/bin/bash
+
+# Usage
+Usage() {
+  echo "Usage: ${PROG_NAME} "
+  echo "  -D|--dry-run: perform dry run (default: false)"
+  echo "  -f|--fresh: create fresh cluster (default: false)"
+  echo "  -d|--num-dc: number of data centers (default: 1)"
+  echo "  -n|--num-broker: number of brokers per DC (default: 1)"
+  echo "  -h|--help: print help"
+}
+
+MyEcho() {
+    echo [`date +"%Y-%m-%d %H:%M:%S"`] $1 $2
+}
+
+# Validate
+Validate() {
+    if [[ ! -d ${CONFLUENT_HOME} ]] ; then
+        MyEcho "ERROR" "CONFLUENT_HOME is not set"
+        exit 1
+    fi
+
+    if [[ ${NUM_BROKER} -lt 1 ]] ; then
+        MyEcho "ERROR" "Number of brokers must be greater than 0"
+        Usage
+        exit 1
+    fi
+
+    if [[ ${NUM_DC} -ne 1 ]] ; then
+        MyEcho "ERROR" "Number of DC must be equal to 1. greater than 1 to be implemented"
+        Usage
+        exit 1
+    fi
+    DC_ID=1
+
+    if [[ ${NUM_BROKER} -gt 1 ]] ; then
+        REPLICATION_FACTOR=$(( ${NUM_BROKER} - 1 ))
+        if [[ ${REPLICATION_FACTOR} -gt 2 ]] ; then
+          MIN_ISR=$(( ${REPLICATION_FACTOR} - 1 ))
+        fi
+    fi
+}
+
+# Export vars
+ExportVars() {
+    export CP_DIR=${HOME}/_official/cp
+    export SCRIPT_DIR=${CP_DIR}/script
+    export DATA_DIR=${CP_DIR}/data
+    export LOG_DIR="${DATA_DIR}/logs"
+}
+
+# Echo vars
+EchoVars() {
+    echo ""
+    echo ""
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "Begin All Vars"
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "PROG_NAME="${PROG_NAME}
+    MyEcho "INFO" "FRESH="${FRESH}
+    MyEcho "INFO" "DRY_RUN="${DRY_RUN}
+    MyEcho "INFO" "NUM_DC="${NUM_DC}
+    MyEcho "INFO" "NUM_BROKER="${NUM_BROKER}
+    MyEcho "INFO" "MIN_ISR="${MIN_ISR}
+    MyEcho "INFO" "REPLICATION_FACTOR="${REPLICATION_FACTOR}
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "End All Vars"
+    MyEcho "INFO" "####################"
+    echo ""
+    echo ""
+}
+
+# Generate properties
+GenerateProperties() {
+    echo ""
+}
+
+# Process args
+ProcessArgs() {
+    POSITIONAL_ARGS=()
+
+    NUM_DC=1
+    NUM_BROKER=1
+    REPLICATION_FACTOR=1
+    MIN_ISR=1
+    PROG_NAME=$0
+    FRESH=0
+    NOHUP=1
+    DRY_RUN=0
+
+    if [[ $# -eq 0 ]]; then
+        return
+    fi
+
+    while [[ $# -gt 0 ]]; do
+    case $1 in
+        -n|--num-broker)
+        export NUM_BROKER="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -d|--num-dc)
+        export NUM_DC="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -f|--fresh)
+        export FRESH=1
+        shift # past argument
+        ;;
+        -D|--dry-run)
+        export DRY_RUN=1
+        shift # past argument
+        ;;
+        -h|--help)
+        MyEcho "INFO" "Printing help"
+        Usage
+        exit 0
+        ;;
+        -*|--*)
+        MyEcho "ERROR" "Unknown option $1"
+        Usage
+        exit 1
+        ;;
+        *)
+        POSITIONAL_ARGS+=("$1") # save positional arg
+        shift # past argument
+        ;;
+    esac
+    done
+
+    set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+}
+
+RunProcess() {
+    if [[ ${FRESH} -eq 1 ]] ; then
+        MyEcho "INFO" "Deleting log dir ${LOG_DIR}"
+        if [[ ${DRY_RUN} -eq 0 ]] ; then
+            rm -Rf ${LOG_DIR}
+            mkdir -p ${LOG_DIR}
+        fi
+
+        MyEcho "INFO" "Deleting data dir ${DATA_DIR}"
+        if [[ ${DRY_RUN} -eq 0 ]] ; then
+            rm -Rf ${DATA_DIR}
+            mkdir -p ${DATA_DIR}
+        fi
+    fi
+    mkdir -p ${LOG_DIR}
+    mkdir -p ${DATA_DIR}
+
+    MyEcho "INFO" "Starting ZooKeeper nohup ${SCRIPT_DIR}/start_zk 2>&1 > ${LOG_DIR}/zk.log ..."
+    if [[ ${DRY_RUN} -eq 0 ]] ; then
+        nohup ${SCRIPT_DIR}/start_zk 2>&1 > ${LOG_DIR}/zk.log &
+    fi
+    DC_ITER=1
+    while [[ ${DC_ITER} -le ${NUM_DC} ]]
+    do
+        DC_ID=${DC_ITER}
+        BROKER_ITER=1
+        while [[ ${BROKER_ITER} -le ${NUM_BROKER} ]]
+        do
+            BROKER_ID=${BROKER_ITER}
+            MyEcho "INFO" "Sleeping 5 secs ..."
+            sleep 5
+            MyEcho "INFO" "Starting Broker ${SCRIPT_DIR}/start_ak --replication-factor ${REPLICATION_FACTOR} --min-isr ${MIN_ISR} --broker-id ${BROKER_ID} --dc-id ${DC_ID} --nohup ..."
+            if [[ ${DRY_RUN} -eq 0 ]] ; then
+                ${SCRIPT_DIR}/start_ak --replication-factor ${REPLICATION_FACTOR} --min-isr ${MIN_ISR} --broker-id ${BROKER_ID} --dc-id ${DC_ID} --nohup
+            fi
+            BROKER_ITER=$(( ${BROKER_ITER} + 1 ))
+        done
+        DC_ITER=$(( ${DC_ITER} + 1 ))
+    done
+}
+
+# Main function
+main() {
+    ProcessArgs $@
+    ExportVars
+    Validate
+    EchoVars
+    GenerateProperties
+    RunProcess
+}
+
+######################################################################
+# Main Processing Starts Here
+######################################################################
+main $@

@@ -1,1 +1,4 @@
-{}
+{
+  "editor.tabSize": 2,
+  "terminal.integrated.tabStopWidth": 2
+}

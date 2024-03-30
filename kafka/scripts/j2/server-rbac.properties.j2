@@ -1,0 +1,120 @@
+authorizer.class.name=io.confluent.kafka.security.authorizer.ConfluentServerAuthorizer
+auto.create.topics.enable=false
+confluent.authorizer.access.rule.providers=ZK_ACL,CONFLUENT
+confluent.balancer.enable=true
+confluent.cluster.link.enable=true
+confluent.license.topic.replication.factor={{ REPLICATION_FACTOR }}
+confluent.metadata.server.authentication.method=BEARER
+confluent.metadata.server.enable.server.urls.refresh=false
+confluent.metadata.server.listeners=http://0.0.0.0:{{ CONFLUENT_HTTP_SERVER_LISTENERS }}
+confluent.metadata.server.public.key.path={{ CFG_DIR }}/public.pem
+confluent.metadata.server.token.auth.enable=true
+confluent.metadata.server.token.key.path={{ CFG_DIR }}/tokenKeyPair.pem
+confluent.metadata.server.token.max.lifetime.ms=3600000
+confluent.metadata.server.token.signature.algorithm=RS256
+default.replication.factor={{ REPLICATION_FACTOR }}
+delete.topic.enable=true
+group.max.session.timeout.ms=1200000
+inter.broker.listener.name=REPLICATION
+inter.broker.protocol.version=2.6
+kafka.rest.bootstrap.servers=localhost:{{ TOKEN_PORT }}
+kafka.rest.client.sasl.jaas.config=org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required metadataServerUrls="http://localhost:{{ CONFLUENT_HTTP_SERVER_LISTENERS }}" username="cn=admin,dc=rahasak,dc=com" password="rahasak";
+kafka.rest.client.sasl.mechanism=OAUTHBEARER
+kafka.rest.client.security.protocol=SASL_PLAINTEXT
+kafka.rest.confluent.metadata.basic.auth.user.info=cn=admin,dc=rahasak,dc=com:rahasak
+kafka.rest.confluent.metadata.bootstrap.server.urls=http://localhost:{{ CONFLUENT_HTTP_SERVER_LISTENERS }}
+kafka.rest.confluent.metadata.http.auth.credentials.provider=BASIC
+kafka.rest.enable=true
+kafka.rest.kafka.rest.resource.extension.class=io.confluent.kafkarest.security.KafkaRestSecurityResourceExtension
+kafka.rest.public.key.path=/Users/vnarayanan/_official/cp/config/public.pem
+kafka.rest.rest.servlet.initializor.classes=io.confluent.common.security.jetty.initializer.InstallBearerOrBasicSecurityHandler
+ldap.com.sun.jndi.ldap.read.timeout=30000
+ldap.java.naming.provider.url=ldap://localhost:389
+ldap.java.naming.security.authentication=simple
+ldap.java.naming.security.credentials=confluentrox
+ldap.java.naming.security.principal=cn=admin,dc=test,dc=com
+ldap.refresh.interval.ms=300000
+ldap.search.mode=USERS
+ldap.search.page.size=1000
+ldap.user.name.attribute=uid
+ldap.user.object.class=posixAccount
+ldap.user.search.base=dc=test,dc=com
+ldap.user.search.scope=2
+listener.name.external.plain.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required;
+listener.name.external.plain.sasl.server.callback.handler.class=io.confluent.security.auth.provider.ldap.LdapAuthenticateCallbackHandler
+listener.name.external.sasl.enabled.mechanisms=PLAIN
+listener.name.external.sasl.mechanism=PLAIN
+listener.name.internal.plain.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="admin-secret" user_admin="admin-secret" user_alice="alice-secret";
+listener.name.internal.sasl.enabled.mechanisms=PLAIN
+listener.name.internal.sasl.mechanism=PLAIN
+listener.name.replication.plain.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="admin-secret" user_admin="admin-secret" user_alice="alice-secret";
+listener.name.replication.sasl.enabled.mechanisms=PLAIN
+listener.name.replication.sasl.mechanism=PLAIN
+listener.name.token.oauthbearer.sasl.jaas.config=org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required publicKeyPath="{{ CFG_DIR }}/public.pem";
+listener.name.token.oauthbearer.sasl.login.callback.handler.class=io.confluent.kafka.server.plugins.auth.token.TokenBearerServerLoginCallbackHandler
+listener.name.token.oauthbearer.sasl.server.callback.handler.class=io.confluent.kafka.server.plugins.auth.token.TokenBearerValidatorCallbackHandler
+listener.name.token.sasl.enabled.mechanisms=OAUTHBEARER
+listener.name.token.sasl.mechanism=OAUTHBEARER
+listener.security.protocol.map=EXTERNAL:SASL_PLAINTEXT,INTERNAL:SASL_PLAINTEXT,REPLICATION:SASL_PLAINTEXT,TOKEN:SASL_PLAINTEXT
+listeners=EXTERNAL://:{{ EXTERNAL_PORT }},INTERNAL://:{{ LISTENERS_PORT }},REPLICATION://:{{ REPLICATION_PORT }},TOKEN://:{{ TOKEN_PORT }}
+log.dirs={{ DATA_DIR }}/kafka-logs-rbac-{{ BROKER_ID }}
+log.message.format.version=2.6
+log.retention.check.interval.ms=300000
+log.retention.hours=168
+log.retention.ms=86400000
+log.segment.bytes=1073741824
+min.insync.replicas={{ MIN_ISR }}
+num.io.threads=16
+num.network.threads=16
+num.partitions=3
+num.recovery.threads.per.data.dir=1
+num.replica.fetchers=16
+offsets.commit.timeout.ms=15000
+offsets.retention.minutes=10080
+offsets.topic.compression.codec=3
+offsets.topic.replication.factor={{ REPLICATION_FACTOR }}
+replica.lag.time.max.ms=45000
+replica.selector.class=org.apache.kafka.common.replica.RackAwareReplicaSelector
+replica.socket.receive.buffer.bytes=1048576
+sasl.enabled.mechanisms=PLAIN,OAUTHBEARER
+sasl.mechanism.inter.broker.protocol=PLAIN
+socket.receive.buffer.bytes=1048576
+socket.request.max.bytes=104857600
+socket.send.buffer.bytes=1048576
+super.users=User:admin;User:cn=admin,dc=test,dc=com,User:uid=consumer,dc=test,dc=com;User:uid=producer,dc=test,dc=com
+transaction.state.log.min.isr={{ MIN_ISR }}
+transaction.state.log.replication.factor={{ REPLICATION_FACTOR }}
+zookeeper.clientCnxnSocket=org.apache.zookeeper.ClientCnxnSocketNetty
+zookeeper.connect=localhost:{{ ZK_PORT }}/kafka-rbac
+zookeeper.session.timeout.ms=22500
+advertised.listeners=EXTERNAL://localhost:{{ EXTERNAL_PORT }},INTERNAL://localhost:{{ LISTENERS_PORT }},REPLICATION://localhost:{{ REPLICATION_PORT }},TOKEN://localhost:{{ TOKEN_PORT }}
+broker.id={{ BROKER_ID }}
+broker.rack={{ DC_ID}}
+confluent.metadata.server.advertised.listeners=http://localhost:{{ CONFLUENT_HTTP_SERVER_LISTENERS }}
+confluent.tier.metadata.replication.factor={{ REPLICATION_FACTOR }}
+default.replication.factor={{ REPLICATION_FACTOR }}
+offsets.topic.replication.factor={{ REPLICATION_FACTOR }}
+transaction.state.log.replication.factor={{ REPLICATION_FACTOR }}
+confluent.license.topic.replication.factor={{ REPLICATION_FACTOR }}
+confluent.metadata.topic.replication.factor={{ REPLICATION_FACTOR }}
+confluent.balancer.topic.replication.factor={{ REPLICATION_FACTOR }}
+confluent.security.event.logger.exporter.kafka.topic.replicas={{ REPLICATION_FACTOR }}
+kafkastore.topic.replication.factor={{ REPLICATION_FACTOR }}
+
+{% if HEALTHPLUS_ENABLED == '0' -%}
+##################### Confluent Metrics Reporter #######################
+metric.reporters=io.confluent.metrics.reporter.ConfluentMetricsReporter
+confluent.metrics.reporter.topic.replicas={{ REPLICATION_FACTOR }}
+confluent.metrics.reporter.bootstrap.servers=localhost:{{ REPLICATION_PORT }}
+confluent.metrics.reporter.publish.ms=30000
+confluent.metrics.reporter.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="admin-secret";
+confluent.metrics.reporter.sasl.mechanism=PLAIN
+confluent.metrics.reporter.security.protocol=SASL_PLAINTEXT
+confluent.metrics.reporter.topic.replicas={{ REPLICATION_FACTOR }}
+{% else -%}
+##################### Health+ Reporter #######################
+metric.reporters=io.confluent.telemetry.reporter.TelemetryReporter
+confluent.telemetry.enabled=true
+confluent.telemetry.api.key=RPFJLWG4DGWBXU3E
+confluent.telemetry.api.secret=7JC1F5W6fF/teseeu9p4wKuAzovP6NI0AwvDoUCJ5L2DbBV8ogHYlEsJSypbxa4k
+{% endif -%}

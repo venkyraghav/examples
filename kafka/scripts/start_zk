@@ -1,0 +1,93 @@
+#!/bin/bash
+
+ExportVars() {
+    export MY_IP=$(ifconfig en0 | grep inet | awk '$1=="inet" {print $2}')
+    export DATA_DIR
+    export kafka.logs.dir=${LOG_DIR}/zk
+    export KAFKA_LOG4J_OPTS="-Dkafka.logs.dir=${LOG_DIR}/zk -Dlog4j.configuration=file://${PROP_DIR}/log4j_zk.properties"
+    export JMX_PORT=8080
+    export JOLOKIA_PORT=7770
+
+    export KAFKA_OPTS="-DVENKY.LOCAL -Dnode=ZK"
+
+    KAFKA_JMX_OPTS="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.host=${MY_IP} -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+    KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS} -Djava.rmi.server.hostname=${MY_IP}"
+    KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS} -Djava.net.preferIPv4Stack=true"
+    KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS} -javaagent:${JOLOKIA_JAR}=config=${CFG_DIR}/zk_jolokia.properties"
+    KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS} -javaagent:${JMX_PROM_JAR}=${JMX_PORT}:${PROP_DIR}/zookeeper.yml"
+    export KAFKA_JMX_OPTS
+}
+
+ProcessArgs() {
+    POSITIONAL_ARGS=()
+    export NOHUP=0
+    export PROG_NAME=$0
+    if [[ $# -eq 0 ]]; then
+        return
+    fi
+
+    while [[ $# -gt 0 ]]; do
+    case $1 in
+        -n|--nohup)
+        export NOHUP=1
+        shift # past argument
+        ;;
+        -h|--help)
+        MyEcho "INFO" "Printing help"
+        Usage
+        exit 0
+        ;;
+        -*|--*)
+        MyEcho "ERROR" "Unknown option $1"
+        Usage
+        exit 1
+        ;;
+        *)
+        POSITIONAL_ARGS+=("$1") # save positional arg
+        shift # past argument
+        ;;
+    esac
+    done
+
+    set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+}
+
+Validate() {
+    echo ""
+}
+
+EchoVars() {
+    MyEcho "INFO" "KAFKA_LOG4J_OPTS=${KAFKA_LOG4J_OPTS}"
+    MyEcho "INFO" "KAFKA_OPTS=${KAFKA_OPTS}"
+    MyEcho "INFO" "NOHUP=${NOHUP}"
+}
+
+GenerateProperties() {
+    RunJ2 ${J2_DIR}/zookeeper.properties.j2 ${CFG_DIR}/zookeeper.properties
+    RunJ2 ${J2_DIR}/jolokia.properties.j2 ${CFG_DIR}/zk_jolokia.properties
+}
+
+main() {
+    source ${base_dir}/common
+    Precheck
+    ProcessArgs $@
+    ExportVars
+    Validate
+    EchoVars
+    GenerateProperties
+
+    MyEcho "INFO" "Starting Zookeeper with ${CFG_DIR}/zookeeper.properties ..."
+    if [[ ${NOHUP} -eq 0 ]] ; then
+        MyEcho "INFO" "${CONFLUENT_HOME}/bin/zookeeper-server-start ${CFG_DIR}/zookeeper.properties ..."
+        ${CONFLUENT_HOME}/bin/zookeeper-server-start ${CFG_DIR}/zookeeper.properties
+    else
+        MyEcho "INFO" "nohup ${CONFLUENT_HOME}/bin/zookeeper-server-start ${CFG_DIR}/zookeeper.properties 2>&1 > ${LOG_DIR}/zk_nohup.log & ..."
+        nohup ${CONFLUENT_HOME}/bin/zookeeper-server-start ${CFG_DIR}/zookeeper.properties 2>&1 > ${LOG_DIR}/zk_nohup.log &
+    fi
+}
+
+######################################################################
+# Main Processing Starts Here
+######################################################################
+base_dir=$(dirname $0)
+main $@
