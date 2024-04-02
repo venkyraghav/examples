@@ -6,18 +6,6 @@ MyEcho() {
     echo [`date +"%Y-%m-%d %H:%M:%S"`] $1 $2
 }
 
-
-RunJ2() {
-    if [[ ! -f $1 ]]; then
-        MyEcho "ERROR" "$1 does not exist"
-        exit 1
-    fi
-    if [[ -f $2 ]]; then
-        MyEcho "WARN" "$2 exist. Overwriting ..."
-    fi
-    j2 $1 > $2
-}
-
 CheckOrCreateDir() {
     DIR=$1
     mkdir -p ${DIR}
@@ -30,8 +18,25 @@ AbsPath() {
     cd "$OLDPWD"
 }
 
-Precheck() {
+AbsDir() {
     ABSPATH=$( AbsPath ${base_dir} )
+}
+
+RunJ2() {
+    if [[ ! -f $1 ]]; then
+        MyEcho "ERROR" "$1 does not exist"
+        exit 1
+    fi
+    if [[ -f $2 ]]; then
+        MyEcho "WARN" "$2 exist. Overwriting ..."
+    fi
+    j2 $1 > $2
+}
+
+Precheck() {
+    AbsDir
+    STATE_FILE=${ABSPATH}/.state
+    SCRIPT_DIR=${ABSPATH}
     JAR_DIR=$( CheckOrCreateDir ${ABSPATH}/jar )
     GEN_DIR=$( CheckOrCreateDir ${ABSPATH}/generated )
     CFG_DIR=$( CheckOrCreateDir ${GEN_DIR}/config )

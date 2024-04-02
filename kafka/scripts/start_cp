@@ -2,12 +2,12 @@
 
 # Usage
 Usage() {
-  echo "Usage: ${PROG_NAME} "
-  echo "  -D|--dry-run: perform dry run (default: false)"
-  echo "  -f|--fresh: create fresh cluster (default: false)"
-  echo "  -d|--num-dc: number of data centers (default: 1)"
-  echo "  -n|--num-broker: number of brokers per DC (default: 1)"
-  echo "  -h|--help: print help"
+    echo "Usage: ${PROG_NAME} "
+    echo "  -D|--dry-run: perform dry run (default: false)"
+    echo "  -f|--fresh: create fresh cluster (default: false)"
+    echo "  -d|--num-dc: number of data centers (default: 1)"
+    echo "  -n|--num-broker: number of brokers per DC (default: 1)"
+    echo "  -h|--help: print help"
 }
 
 MyEcho() {
@@ -42,14 +42,6 @@ Validate() {
     fi
 }
 
-# Export vars
-ExportVars() {
-    export CP_DIR=${HOME}/_official/cp
-    export SCRIPT_DIR=${CP_DIR}/script
-    export DATA_DIR=${CP_DIR}/data
-    export LOG_DIR="${DATA_DIR}/logs"
-}
-
 # Echo vars
 EchoVars() {
     echo ""
@@ -68,11 +60,6 @@ EchoVars() {
     MyEcho "INFO" "End All Vars"
     MyEcho "INFO" "####################"
     echo ""
-    echo ""
-}
-
-# Generate properties
-GenerateProperties() {
     echo ""
 }
 
@@ -174,17 +161,61 @@ RunProcess() {
     done
 }
 
+LoadState() {
+    if [[ -f ${STATE_FILE} ]] ; then
+        MyEcho "INFO" "File exists {STATE_FILE}=${STATE_FILE}"
+        source ${STATE_FILE}
+    fi
+}
+
+CheckState() {
+    if [[ -z "${DC0}" ]] ; then
+        MyEcho "ERROR" "NO DC in ${STATE_FILE}"
+        # No info from .state file
+        return
+    fi
+    if [[ ${FRESH} -eq 1 ]] ; then
+        MyEcho "INFO" "Fresh deploy"
+        # Fresh deploy; Don't check state
+        return
+    fi
+    
+    if [[ ${NUM_DC} -ne ${DC0} ]] ; then
+        MyEcho "ERROR" "State Mismatch: Current DC ${DC0}, Needed DC ${NUM_DC}. Use Fresh Deploy option. Exiting ..."
+        Usage
+        exit 1
+    fi
+    if [[ ${NUM_BROKER} -ne ${BROKER0} ]] ; then
+        MyEcho "ERROR" "State Mismatch: Current Broker ${BROKER0}, Needed Broker ${NUM_BROKER}. Use Fresh Deploy option. Exiting ..."
+        Usage
+        exit 1
+    fi
+}
+
+CommitState() {
+    if [[ ${DRY_RUN} -eq 1 ]] ; then
+        return
+    fi
+    echo "CURR_TIME=`date '+%Y%m%d_%H%M%S'`" > ${STATE_FILE}
+    echo "DC0=${NUM_DC}" >> ${STATE_FILE}
+    echo "BROKER0=${NUM_BROKER}" >> ${STATE_FILE}
+}
+
 # Main function
 main() {
+    source ${base_dir}/common
+    Precheck
+    LoadState
     ProcessArgs $@
-    ExportVars
+    CheckState
     Validate
     EchoVars
-    GenerateProperties
     RunProcess
+    CommitState
 }
 
 ######################################################################
 # Main Processing Starts Here
 ######################################################################
+base_dir=$(dirname $0)
 main $@
