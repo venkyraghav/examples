@@ -1,0 +1,205 @@
+#!/bin/bash
+
+# Usage
+Usage() {
+  echo "Usage: ${PROG_NAME} "
+  echo "  -D|--dry-run: dry run (default: ${DRY_RUN})"
+  echo "  -f|--fresh: fresh start (default: ${FRESH})"
+  echo "  -r|--replication-factor: replication factor (default: ${REPLICATION_FACTOR})"
+  echo "  -m|--min-isr: min isr (default: ${MIN_ISR})"
+  echo "  -P|--topic-prefix: topic prefix (default: ${TOPIC_PREFIX})"
+  echo "  -T|--topic-count: topic count (default: ${TOPIC_COUNT})"
+  echo "  -p|--partition-count: partition count (default: ${PARTITION_COUNT})"
+  echo "  -n|--num-records: (default: ${NUM_RECORDS})"
+  echo "  -R|--record-sizet: (default: ${RECORD_SIZE})"
+  echo "  -t|--tps: (default: ${THROUGHPUT})"
+  echo "  -b|--bootstrap-server: (default: ${BOOTSTRAP_SERVER})"
+  echo "  -n|--num-records: (default: ${NUM_RECORDS})"
+  echo "  -R|--record-size: (default: ${RECORD_SIZE})"
+  echo "  -t|--tps: (default: ${THROUGHPUT})"
+  echo "  -b|--bootstrap-server: (default: ${BOOTSTRAP_SERVER})"
+  echo "  -h|--help: print help"
+}
+
+
+# Process args
+ProcessArgs() {
+    POSITIONAL_ARGS=()
+
+    export DRY_RUN=0
+    export FRESH=0
+    export TOPIC_PREFIX="test_topic"
+    export TOPIC_COUNT=3
+    export PARTITION_COUNT=3
+    export REPLICATION_FACTOR=2
+    export MIN_ISR=1
+    export NUM_RECORDS=1000000
+    export RECORD_SIZE=1000
+    export THROUGHPUT=500
+    export BOOTSTRAP_SERVER=${MY_LOCAL_IP}:9091
+
+    export PROG_NAME=$0
+    if [[ $# -eq 0 ]]; then
+        return
+    fi
+
+    while [[ $# -gt 0 ]]; do
+    case $1 in
+        -D|--dry-run)
+        export DRY_RUN=1
+        shift # past argument
+        ;;
+        -f|--fresh)
+        export FRESH=1
+        shift # past argument
+        ;;
+        -P|--topic-prefix)
+        export TOPIC_PREFIX="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -T|--topic-count)
+        export TOPIC_COUNT="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -p|--partition-count)
+        export PARTITION_COUNT="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -r|--replication-factor)
+        export REPLICATION_FACTOR="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -i|--min-isr)
+        export MIN_ISR="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -n|--num-records)
+        export NUM_RECORDS="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -R|--record-sizet)
+        export RECORD_SIZE="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -t|--tps)
+        export THROUGHPUT="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -b|--bootstrap-server)
+        export BOOTSTRAP_SERVER="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -h|--help)
+        MyEcho "INFO" "Printing help"
+        Usage
+        exit 0
+        ;;
+        -*|--*)
+        MyEcho "ERROR" "Unknown option $1"
+        Usage
+        exit 1
+        ;;
+        *)
+        POSITIONAL_ARGS+=("$1") # save positional arg
+        shift # past argument
+        ;;
+    esac
+    done
+
+    set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+}
+
+Validate() {
+    if [[ ${REPLICATION_FACTOR} -lt ${MIN_ISR} ]] ; then
+        MyEcho "ERROR" "replication factor must be greater than or equal to min isr"
+        Usage
+        exit 1
+    fi
+}
+
+# Echo vars
+EchoVars() {
+    echo ""
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "Begin All Vars"
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "PROG_NAME="${PROG_NAME}
+    MyEcho "INFO" "FRESH="${FRESH}
+    MyEcho "INFO" "DRY_RUN="${DRY_RUN}
+    MyEcho "INFO" "TOPIC_PREFIX="${TOPIC_PREFIX}
+    MyEcho "INFO" "TOPIC_COUNT="${TOPIC_COUNT}
+    MyEcho "INFO" "PARTITION_COUNT="${PARTITION_COUNT}
+    MyEcho "INFO" "REPLICATION_FACTOR="${REPLICATION_FACTOR}
+    MyEcho "INFO" "MIN_ISR="${MIN_ISR}
+    MyEcho "INFO" "NUM_RECORDS="${NUM_RECORDS}
+    MyEcho "INFO" "RECORD_SIZE="${RECORD_SIZE}
+    MyEcho "INFO" "THROUGHPUT="${THROUGHPUT}
+    MyEcho "INFO" "BOOTSTRAP_SERVER="${BOOTSTRAP_SERVER}
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "End All Vars"
+    MyEcho "INFO" "####################"
+    echo ""
+}
+
+# Main function
+main() {
+    source ${base_dir}/common
+    ProcessArgs $@
+    Validate
+    EchoVars
+    
+    echo "TODO load options"
+
+    if [[ ${FRESH} -eq 1 ]]; then
+        echo "Deleting old topics ..."
+        for i in `seq 1 ${TOPIC_COUNT}`
+        do
+            topic_name=${TOPIC_PREFIX}_${i}
+            echo "Deleting ${topic_name} ..."
+            echo "kafka-topics --bootstrap-server ${BOOTSTRAP_SERVER} --delete --topic ${topic_name}"
+            if [[ ${DRY_RUN} -eq 0 ]]; then
+                echo "NOT DRY"
+                # kafka-topics --bootstrap-server ${BOOTSTRAP_SERVER} --delete --topic ${topic_name}
+            fi
+        done
+        sleep 10
+
+        echo "Creating topics ..."
+        for i in `seq 1 ${TOPIC_COUNT}`
+        do
+            topic_name=${TOPIC_PREFIX}_${i}
+            echo "Creating ${topic_name} ..."
+            echo "kafka-topics --bootstrap-server ${BOOTSTRAP_SERVER} --create --topic ${topic_name} --partitions ${PARTITION_COUNT} --replication-factor ${REPLICATION_FACTOR} --config min.insync.replicas=${MIN_ISR}"
+            if [[ ${DRY_RUN} -eq 0 ]]; then
+                echo "NOT DRY"
+                # kafka-topics --bootstrap-server ${BOOTSTRAP_SERVER} --create --topic ${topic_name} --partitions ${PARTITION_COUNT} --replication-factor ${REPLICATION_FACTOR} --config min.insync.replicas=${MIN_ISR}
+            fi
+        done
+    fi
+
+    echo "Generating load ..."
+    filename_prefix=/tmp/${TOPIC_PREFIX}
+    for i in `seq 1 ${TOPIC_COUNT}`
+    do
+        topic_name=${TOPIC_PREFIX}_${i}
+        filename=/tmp/${topic_name}_perf.log
+        echo "Output in ${filename} for ${topic_name} ..."
+        echo "nohup kafka-producer-perf-test --topic ${topic_name} --num-records ${NUM_RECORDS} --record-size ${RECORD_SIZE} --throughput ${THROUGHPUT} --producer-props bootstrap.servers=${BOOTSTRAP_SERVER} 2>&1 > ${filename} &"
+        if [[ ${DRY_RUN} -eq 0 ]]; then
+            echo "NOT DRY"
+            # nohup kafka-producer-perf-test --topic ${topic_name} --num-records ${NUM_RECORDS} --record-size ${RECORD_SIZE} --throughput ${THROUGHPUT} --producer-props bootstrap.servers=${BOOTSTRAP_SERVER} 2>&1 > ${filename} &
+        fi
+    done
+}
+
+base_dir=$(dirname $0)
+main $@
