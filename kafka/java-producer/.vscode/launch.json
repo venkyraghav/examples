@@ -6,16 +6,10 @@
     "configurations": [
         {
             "type": "java",
-            "name": "Current File",
-            "request": "launch",
-            "mainClass": "${file}"
-        },
-        {
-            "type": "java",
             "name": "MyProducer",
             "request": "launch",
             "mainClass": "examples.MyProducer",
-            "args": "getting_started.properties",
+            "args": "/Users/venky/Desktop/clientconfig/getting_started.properties transaction",
             "projectName": "java-producer"
         }
     ]
