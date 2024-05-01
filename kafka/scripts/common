@@ -35,7 +35,6 @@ RunJ2() {
 
 Precheck() {
     AbsDir
-    STATE_FILE=${ABSPATH}/.state
     SCRIPT_DIR=${ABSPATH}
     JAR_DIR=$( CheckOrCreateDir ${ABSPATH}/jar )
     GEN_DIR=$( CheckOrCreateDir ${ABSPATH}/generated )
@@ -43,6 +42,7 @@ Precheck() {
     export DATA_DIR=$( CheckOrCreateDir ${GEN_DIR}/data )
     export LOG_DIR=$( CheckOrCreateDir ${GEN_DIR}/logs )
     J2_DIR=${ABSPATH}/j2
+    STATE_FILE=${DATA_DIR}/.state
 
     if [[ ! -d ${CONFLUENT_HOME} ]] ; then
         MyEcho "ERROR" "CONFLUENT_HOME is not set"
@@ -56,6 +56,7 @@ Precheck() {
     if [[ ! -d ${J2_DIR} ]] ; then
         MyEcho "ERROR" "J2_DIR ${J2_DIR} is not set"
         exit 1
+
     fi
     PROP_DIR=${ABSPATH}/prop
     if [[ ! -d ${PROP_DIR} ]] ; then

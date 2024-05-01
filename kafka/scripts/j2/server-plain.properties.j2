@@ -33,20 +33,30 @@ confluent.consumer.lag.emitter.enabled=true
 
 # The address the socket server listens on. If not configured, the host name will be equal to the value of
 # java.net.InetAddress.getCanonicalHostName(), with PLAINTEXT listener name, and port 9092.
-#   FORMAT:
-#     listeners = listener_name://host_name:port
-#   EXAMPLE:
-#     listeners = PLAINTEXT://your.host.name:9092
-listeners=PLAINTEXT://{{ MY_IP }}:{{ LISTENERS_PORT }}
+listeners=SASL_PLAIN://{{ MY_IP }}:{{ LISTENERS_PORT }}
 
 # Listener name, hostname and port the broker will advertise to clients.
 # If not set, it uses the value for "listeners".
-advertised.listeners=PLAINTEXT://{{ MY_IP }}:{{ LISTENERS_PORT }}
+advertised.listeners=SASL_PLAIN://{{ MY_IP }}:{{ LISTENERS_PORT }}
 
 # Maps listener names to security protocols, the default is for them to be the same. See the config documentation for more details
-listener.security.protocol.map=PLAINTEXT:PLAINTEXT
+listener.security.protocol.map=SASL_PLAIN:SASL_PLAINTEXT
 
-# sasl.enabled.mechanisms=
+# List of enabled mechanisms, can be more than one
+sasl.enabled.mechanisms=PLAIN
+inter.broker.listener.name=SASL_PLAIN
+sasl.mechanism.inter.broker.protocol=PLAIN
+
+listener.name.sasl_plain.plain.sasl.enabled.mechanisms=PLAIN
+listener.name.sasl_plain.plain.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required \
+   username="admin" password="admin-secret" \
+   user_admin="admin-secret" user_kafkabroker1="kafkabroker1-secret" user_metrics="metrics-secret" \
+   user_client1="client1-secret" user_client2="client2-secret";
+
+authorizer.class.name=kafka.security.authorizer.AclAuthorizer
+
+super.users=User:admin;User:kafkabroker1;User:metrics
+allow.everyone.if.no.acl.found=false
 
 # The number of threads that the server uses for receiving requests from the network and sending responses to the network
 num.network.threads=3
@@ -62,7 +72,6 @@ socket.receive.buffer.bytes=102400
 
 # The maximum size of a request that the socket server will accept (protection against OOM)
 socket.request.max.bytes=104857600
-
 
 ############################# Log Basics #############################
 
@@ -139,21 +148,6 @@ zookeeper.connect={{ MY_IP }}:{{ ZK_PORT }}/kafka
 # Timeout in ms for connecting to zookeeper
 zookeeper.connection.timeout.ms=18000
 
-{% if HEALTHPLUS_ENABLED == '0' -%}
-##################### Confluent Metrics Reporter #######################
-# Confluent Control Center and Confluent Auto Data Balancer integration
-#
-# Uncomment the following lines to publish monitoring data for
-# Confluent Control Center and Confluent Auto Data Balancer
-# If you are using a dedicated metrics cluster, also adjust the settings
-# to point to your metrics kakfa cluster.
-metric.reporters=io.confluent.metrics.reporter.ConfluentMetricsReporter
-confluent.metrics.reporter.bootstrap.servers={{ MY_IP }}:{{ LISTENERS_PORT }}
-#
-# Uncomment the following line if the metrics cluster has a single broker
-confluent.metrics.reporter.topic.replicas={{ REPLICATION_FACTOR }}
-{% endif -%}
-
 ############################# Group Coordinator Settings #############################
 
 # The following configuration specifies the time, in milliseconds, that the GroupCoordinator will delay the initial consumer rebalance.
@@ -163,33 +157,14 @@ confluent.metrics.reporter.topic.replicas={{ REPLICATION_FACTOR }}
 # However, in production environments the default value of 3 seconds is more suitable as this will help to avoid unnecessary, and potentially expensive, rebalances during application startup.
 group.initial.rebalance.delay.ms=0
 
-
-############################# Confluent Authorizer Settings  #############################
-
-# Uncomment to enable Confluent Authorizer with support for ACLs, LDAP groups and RBAC
-#authorizer.class.name=io.confluent.kafka.security.authorizer.ConfluentServerAuthorizer
-# Semi-colon separated list of super users in the format <principalType>:<principalName>
-#super.users=
-# Specify a valid Confluent license. By default free-tier license will be used
-#confluent.license=
 # Replication factor for the topic used for licensing. Default is 3.
 confluent.license.topic.replication.factor={{ REPLICATION_FACTOR }}
 
-# Uncomment the following lines and specify values where required to enable CONFLUENT provider for RBAC and centralized ACLs
-# Enable CONFLUENT provider 
-#confluent.authorizer.access.rule.providers=ZK_ACL,CONFLUENT
-# Bootstrap servers for RBAC metadata. Must be provided if this broker is not in the metadata cluster
-#confluent.metadata.bootstrap.servers=PLAINTEXT://127.0.0.1:9092
 # Replication factor for the metadata topic used for authorization. Default is 3.
 confluent.metadata.topic.replication.factor={{ REPLICATION_FACTOR }}
 
 # Replication factor for the topic used for audit logs. Default is 3.
 confluent.security.event.logger.exporter.kafka.topic.replicas={{ REPLICATION_FACTOR }}
-
-# Listeners for metadata server
-#confluent.metadata.server.listeners=http://0.0.0.0:8090
-# Advertised listeners for metadata server
-#confluent.metadata.server.advertised.listeners=http://127.0.0.1:8090
 
 ############################# Confluent Data Balancer Settings  #############################
 
@@ -258,4 +233,11 @@ metric.reporters=io.confluent.telemetry.reporter.TelemetryReporter
 confluent.telemetry.enabled=true
 confluent.telemetry.api.key=<HEALTHPLUS-API-KEY>
 confluent.telemetry.api.secret=<HEALTHPLUS-SECRET>
+{% else %}
+confluent.metrics.reporter.topic.replicas={{ REPLICATION_FACTOR }}
+metric.reporters=io.confluent.metrics.reporter.ConfluentMetricsReporter
+confluent.metrics.reporter.bootstrap.servers={{ MY_IP }}:{{ LISTENERS_PORT }}
+confluent.metrics.reporter.sasl.mechanism=PLAIN
+confluent.metrics.reporter.security.protocol=SASL_PLAINTEXT
+confluent.metrics.reporter.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="metrics" password="metrics-secret";
 {% endif -%}

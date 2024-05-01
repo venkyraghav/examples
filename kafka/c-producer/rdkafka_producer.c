@@ -125,8 +125,10 @@ static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void 
         log_error(MAIN, msg_buf);
     }
     else {
-        sprintf(msg_buf, "Message delivered (%zd bytes, partition %" PRId32 ", offset %" PRId64 ")",
-                rkmessage->len, rkmessage->partition, rkmessage->offset);
+        // sprintf(msg_buf, "Message delivered (%zd bytes, partition %" PRId32 ", offset %" PRId64 "), message: %.*s",
+        //         rkmessage->len, rkmessage->partition, rkmessage->offset, (const char*)rkmessage->payload);
+        sprintf(msg_buf, "Message delivered (%zd bytes, partition %" PRId32 ", offset %" PRId64 ") %.*s",
+                rkmessage->len, rkmessage->partition, rkmessage->offset, (int)rkmessage->len, (const char *)rkmessage->payload);
         log_info(MAIN, msg_buf);
     }
 
@@ -423,7 +425,7 @@ int main(int argc, char **argv)
     **--------------------------------------------------
     */
 
-    char *str = malloc(recordlen);
+    char *str = malloc(recordlen + 1);
     int iter = -1;
     
     long last = current_timestamp();
@@ -438,7 +440,7 @@ int main(int argc, char **argv)
         {
             useconds_t sleepfor = 1000000/tps;
             sprintf(msg_buf, "Published %d messages. Sleeping for %d microsecs, Curr %zd Last %zd ...", iter, sleepfor, current_timestamp(), last);
-            // log_debug(MAIN, msg_buf);
+            log_debug(MAIN, msg_buf);
             usleep(sleepfor); // 2 milli or 2000 micro secs
             // log_debug(MAIN, "Done Sleeping");
         }
@@ -453,8 +455,9 @@ int main(int argc, char **argv)
         }
 
     retry:
+    log_debug(MAIN, str);
         err = rd_kafka_producev(rk, RD_KAFKA_V_TOPIC(topic), RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
-                                RD_KAFKA_V_VALUE(buf, recordlen), RD_KAFKA_V_OPAQUE(NULL), RD_KAFKA_V_END);
+                                RD_KAFKA_V_VALUE(str, strlen(str)), RD_KAFKA_V_OPAQUE(NULL), RD_KAFKA_V_END);
 
         if (err)
         {
@@ -486,7 +489,7 @@ int main(int argc, char **argv)
         }
         else
         {
-            sprintf(msg_buf, "Enqueued message (%zd bytes) for topic %s", recordlen, topic);
+            sprintf(msg_buf, "Enqueued message (%zd bytes) for topic %s -> %s", recordlen, topic, str);
             log_info(MAIN, msg_buf);
         }
 

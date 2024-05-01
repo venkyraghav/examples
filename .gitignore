@@ -38,3 +38,6 @@ hs_err_pid*
 **/rdkafka_producer
 **/rdkafka_complex_consumer_example
 **/.state
+**/*bazel*
+**/.vscode
+**/.vscode/*

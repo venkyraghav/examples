@@ -2,6 +2,5 @@
     "files.associations": {
         "glib.h": "c",
         "rdkafka.h": "c"
-    },
-    "C_Cpp.default.cppStandard": "c++17"
+    }
 }

@@ -7,6 +7,8 @@ Usage() {
   echo "  -f|--fresh: fresh start (default: ${FRESH})"
   echo "  -r|--replication-factor: replication factor (default: ${REPLICATION_FACTOR})"
   echo "  -m|--min-isr: min isr (default: ${MIN_ISR})"
+  echo "  -rb|--retention-bytes: retention bytes (default: ${RETENTION_BYTES})"
+  echo "  -rm|--retention-ms: retention ms (default: ${RETENTION_MS})"
   echo "  -P|--topic-prefix: topic prefix (default: ${TOPIC_PREFIX})"
   echo "  -T|--topic-count: topic count (default: ${TOPIC_COUNT})"
   echo "  -p|--partition-count: partition count (default: ${PARTITION_COUNT})"
@@ -36,6 +38,8 @@ ProcessArgs() {
     export NUM_RECORDS=1000000
     export RECORD_SIZE=1000
     export THROUGHPUT=500
+    export RETENTION_BYTES=1000000000
+    export RETENTION_MS=172800000
     export BOOTSTRAP_SERVER=${MY_LOCAL_IP}:9091
 
     export PROG_NAME=$0
@@ -75,6 +79,16 @@ ProcessArgs() {
         ;;
         -i|--min-isr)
         export MIN_ISR="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -rb|--retention-bytes)
+        export RETENTION_BYTES="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -rm|--retention-ms)
+        export RETENTION_MS="$2"
         shift # past argument
         shift # past value
         ;;
@@ -144,6 +158,8 @@ EchoVars() {
     MyEcho "INFO" "RECORD_SIZE="${RECORD_SIZE}
     MyEcho "INFO" "THROUGHPUT="${THROUGHPUT}
     MyEcho "INFO" "BOOTSTRAP_SERVER="${BOOTSTRAP_SERVER}
+    MyEcho "INFO" "RETENTION_BYTES="${RETENTION_BYTES}
+    MyEcho "INFO" "RETENTION_MS="${RETENTION_MS}
     MyEcho "INFO" "####################"
     MyEcho "INFO" "End All Vars"
     MyEcho "INFO" "####################"
@@ -156,8 +172,6 @@ main() {
     ProcessArgs $@
     Validate
     EchoVars
-    
-    echo "TODO load options"
 
     if [[ ${FRESH} -eq 1 ]]; then
         echo "Deleting old topics ..."
@@ -165,25 +179,26 @@ main() {
         do
             topic_name=${TOPIC_PREFIX}_${i}
             echo "Deleting ${topic_name} ..."
-            echo "kafka-topics --bootstrap-server ${BOOTSTRAP_SERVER} --delete --topic ${topic_name}"
+            echo "kafka-topics --bootstrap-server ${BOOTSTRAP_SERVER} --command-config ~/github.com/venkyraghav/examples/kafka/scripts/prop/admin-client.properties --delete --topic ${topic_name}"
             if [[ ${DRY_RUN} -eq 0 ]]; then
                 echo "NOT DRY"
-                # kafka-topics --bootstrap-server ${BOOTSTRAP_SERVER} --delete --topic ${topic_name}
+                kafka-topics --bootstrap-server ${BOOTSTRAP_SERVER} --command-config ~/github.com/venkyraghav/examples/kafka/scripts/prop/admin-client.properties --delete --topic ${topic_name}
             fi
         done
-        sleep 10
+        sleep 5
 
         echo "Creating topics ..."
         for i in `seq 1 ${TOPIC_COUNT}`
         do
             topic_name=${TOPIC_PREFIX}_${i}
             echo "Creating ${topic_name} ..."
-            echo "kafka-topics --bootstrap-server ${BOOTSTRAP_SERVER} --create --topic ${topic_name} --partitions ${PARTITION_COUNT} --replication-factor ${REPLICATION_FACTOR} --config min.insync.replicas=${MIN_ISR}"
+            echo "kafka-topics --bootstrap-server ${BOOTSTRAP_SERVER} --command-config ~/github.com/venkyraghav/examples/kafka/scripts/prop/admin-client.properties --create --topic ${topic_name} --partitions ${PARTITION_COUNT} --replication-factor ${REPLICATION_FACTOR} --config min.insync.replicas=${MIN_ISR} --config retention.bytes=${RETENTION_BYTES} --config retention.ms=${RETENTION_MS}"
             if [[ ${DRY_RUN} -eq 0 ]]; then
                 echo "NOT DRY"
-                # kafka-topics --bootstrap-server ${BOOTSTRAP_SERVER} --create --topic ${topic_name} --partitions ${PARTITION_COUNT} --replication-factor ${REPLICATION_FACTOR} --config min.insync.replicas=${MIN_ISR}
+                kafka-topics --bootstrap-server ${BOOTSTRAP_SERVER} --command-config ~/github.com/venkyraghav/examples/kafka/scripts/prop/admin-client.properties --create --topic ${topic_name} --partitions ${PARTITION_COUNT} --replication-factor ${REPLICATION_FACTOR} --config min.insync.replicas=${MIN_ISR} --config retention.bytes=${RETENTION_BYTES} --config retention.ms=${RETENTION_MS}
             fi
         done
+        sleep 5
     fi
 
     echo "Generating load ..."
@@ -193,10 +208,10 @@ main() {
         topic_name=${TOPIC_PREFIX}_${i}
         filename=/tmp/${topic_name}_perf.log
         echo "Output in ${filename} for ${topic_name} ..."
-        echo "nohup kafka-producer-perf-test --topic ${topic_name} --num-records ${NUM_RECORDS} --record-size ${RECORD_SIZE} --throughput ${THROUGHPUT} --producer-props bootstrap.servers=${BOOTSTRAP_SERVER} 2>&1 > ${filename} &"
+        echo "nohup kafka-producer-perf-test --producer.config ~/github.com/venkyraghav/examples/kafka/scripts/prop/admin-client.properties --topic ${topic_name} --num-records ${NUM_RECORDS} --record-size ${RECORD_SIZE} --throughput ${THROUGHPUT} --producer-props bootstrap.servers=${BOOTSTRAP_SERVER} 2>&1 > ${filename} &"
         if [[ ${DRY_RUN} -eq 0 ]]; then
             echo "NOT DRY"
-            # nohup kafka-producer-perf-test --topic ${topic_name} --num-records ${NUM_RECORDS} --record-size ${RECORD_SIZE} --throughput ${THROUGHPUT} --producer-props bootstrap.servers=${BOOTSTRAP_SERVER} 2>&1 > ${filename} &
+            nohup kafka-producer-perf-test --producer.config ~/github.com/venkyraghav/examples/kafka/scripts/prop/admin-client.properties --topic ${topic_name} --num-records ${NUM_RECORDS} --record-size ${RECORD_SIZE} --throughput ${THROUGHPUT} --producer-props bootstrap.servers=${BOOTSTRAP_SERVER} 2>&1 > ${filename} &
         fi
     done
 }
