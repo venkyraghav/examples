@@ -7,6 +7,7 @@ Usage() {
     echo "  -f|--fresh: create fresh cluster (default: false)"
     echo "  -d|--num-dc: number of data centers (default: 1)"
     echo "  -n|--num-broker: number of brokers per DC (default: 1)"
+    echo "  -a|--auth: authn method. Values noauth, plain, scram, gssapi, rbac (default: noauth)"
     echo "  -h|--help: print help"
 }
 
@@ -40,6 +41,17 @@ Validate() {
           MIN_ISR=$(( ${REPLICATION_FACTOR} - 1 ))
         fi
     fi
+    case ${AUTHN} in
+        noauth|plain|scram|gssapi|rbac)
+        export AUTHN
+        ;;
+        *)
+        MyEcho "ERROR" "Unknown value ${AUTHN} for option -a or --authn"
+        Usage
+        exit 1
+        ;;
+    esac
+
 }
 
 # Echo vars
@@ -56,6 +68,7 @@ EchoVars() {
     MyEcho "INFO" "NUM_BROKER="${NUM_BROKER}
     MyEcho "INFO" "MIN_ISR="${MIN_ISR}
     MyEcho "INFO" "REPLICATION_FACTOR="${REPLICATION_FACTOR}
+    MyEcho "INFO" "AUTHN="${AUTHN}
     MyEcho "INFO" "####################"
     MyEcho "INFO" "End All Vars"
     MyEcho "INFO" "####################"
@@ -75,6 +88,7 @@ ProcessArgs() {
     FRESH=0
     NOHUP=1
     DRY_RUN=0
+    AUTHN=noauth
 
     if [[ $# -eq 0 ]]; then
         return
@@ -89,6 +103,11 @@ ProcessArgs() {
         ;;
         -d|--num-dc)
         export NUM_DC="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -a|--authn)
+        export AUTHN="$2"
         shift # past argument
         shift # past value
         ;;
@@ -151,9 +170,9 @@ RunProcess() {
             BROKER_ID=${BROKER_ITER}
             MyEcho "INFO" "Sleeping 5 secs ..."
             sleep 5
-            MyEcho "INFO" "Starting Broker ${SCRIPT_DIR}/start_ak --replication-factor ${REPLICATION_FACTOR} --min-isr ${MIN_ISR} --broker-id ${BROKER_ID} --dc-id ${DC_ID} --nohup ..."
+            MyEcho "INFO" "Starting Broker ${SCRIPT_DIR}/start_ak --replication-factor ${REPLICATION_FACTOR} --min-isr ${MIN_ISR} --broker-id ${BROKER_ID} --dc-id ${DC_ID} --authn ${AUTHN} --nohup ..."
             if [[ ${DRY_RUN} -eq 0 ]] ; then
-                ${SCRIPT_DIR}/start_ak --replication-factor ${REPLICATION_FACTOR} --min-isr ${MIN_ISR} --broker-id ${BROKER_ID} --dc-id ${DC_ID} --nohup
+                ${SCRIPT_DIR}/start_ak --replication-factor ${REPLICATION_FACTOR} --min-isr ${MIN_ISR} --broker-id ${BROKER_ID} --dc-id ${DC_ID} --authn ${AUTHN} --nohup
             fi
             BROKER_ITER=$(( ${BROKER_ITER} + 1 ))
         done
@@ -180,12 +199,17 @@ CheckState() {
         return
     fi
     
-    if [[ ${NUM_DC} -ne ${DC0} ]] ; then
+    if [[ "${AUTHN}" -ne "${AUTHN0}" ]] ; then
+        MyEcho "ERROR" "State Mismatch: Current Authn ${AUTHN0}, Needed Authn ${AUTHN}. Use Fresh Deploy option. Exiting ..."
+        Usage
+        exit 1
+    fi
+    if [[ "${NUM_DC}" -ne "${DC0}" ]] ; then
         MyEcho "ERROR" "State Mismatch: Current DC ${DC0}, Needed DC ${NUM_DC}. Use Fresh Deploy option. Exiting ..."
         Usage
         exit 1
     fi
-    if [[ ${NUM_BROKER} -ne ${BROKER0} ]] ; then
+    if [[ "${NUM_BROKER}" -ne "${BROKER0}" ]] ; then
         MyEcho "ERROR" "State Mismatch: Current Broker ${BROKER0}, Needed Broker ${NUM_BROKER}. Use Fresh Deploy option. Exiting ..."
         Usage
         exit 1
@@ -197,6 +221,7 @@ CommitState() {
         return
     fi
     echo "CURR_TIME=`date '+%Y%m%d_%H%M%S'`" > ${STATE_FILE}
+    echo "AUTHN0=${AUTHN}" >> ${STATE_FILE}
     echo "DC0=${NUM_DC}" >> ${STATE_FILE}
     echo "BROKER0=${NUM_BROKER}" >> ${STATE_FILE}
 }

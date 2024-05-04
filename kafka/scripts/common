@@ -106,8 +106,16 @@ Precheck() {
         exit 1
     fi
 
-    if [[ ! -f ${J2_DIR}/server.properties.j2 ]] ; then
-        MyEcho "ERROR" "${J2_DIR}/server.properties.j2 does not exist"
+    if [[ ! -f ${J2_DIR}/server-noauth.properties.j2 ]] ; then
+        MyEcho "ERROR" "${J2_DIR}/server-noauth.properties.j2 does not exist"
+        exit 1
+    fi
+    if [[ ! -f ${J2_DIR}/server-plain.properties.j2 ]] ; then
+        MyEcho "ERROR" "${J2_DIR}/server-plain.properties.j2 does not exist"
+        exit 1
+    fi
+    if [[ ! -f ${J2_DIR}/server-scram.properties.j2 ]] ; then
+        MyEcho "ERROR" "${J2_DIR}/server-scram.properties.j2 does not exist"
         exit 1
     fi
     if [[ ! -f ${J2_DIR}/server-rbac.properties.j2 ]] ; then

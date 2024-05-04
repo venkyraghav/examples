@@ -2,15 +2,15 @@
 
 # Usage
 Usage() {
-  echo "Usage: ${PROG_NAME} "
-  echo "  -b|--broker-id: broker id (default: 0)"
-  echo "  -d|--dc-id: data center id (default: 1)"
-  echo "  -r|--replication-factor: replication factor (default: 1)"
-  echo "  -m|--min-isr: min isr (default: 1)"
-  echo "  -R|--rbac: enable rbac (default: false)"
-  echo "  -H|--health-plus: enable health+ (default: false)"
-  echo "  -n|--nohup: run in background (default: false)"
-  echo "  -h|--help: print help"
+    echo "Usage: ${PROG_NAME} "
+    echo "  -b|--broker-id: broker id (default: 0)"
+    echo "  -d|--dc-id: data center id (default: 1)"
+    echo "  -r|--replication-factor: replication factor (default: 1)"
+    echo "  -m|--min-isr: min isr (default: 1)"
+    echo "  -H|--health-plus: enable health+ (default: false)"
+    echo "  -n|--nohup: run in background (default: false)"
+    echo "  -a|--auth: authn method. Values no, plain, scram, gssapi, rbac (default: no)"
+    echo "  -h|--help: print help"
 }
 
 # Validate
@@ -25,6 +25,16 @@ Validate() {
         Usage
         exit 1
     fi
+    case ${AUTHN} in
+        noauth|plain|scram|gssapi|rbac)
+        export AUTHN
+        ;;
+        *)
+        MyEcho "ERROR" "Unknown value ${AUTHN} for option -a or --authn"
+        Usage
+        exit 1
+        ;;
+    esac
 }
 
 # Export vars
@@ -51,7 +61,7 @@ ExportVars() {
 
     LISTENERS_PORT=9090
     export LISTENERS_PORT=$(( LISTENERS_PORT + BROKER_ID ))
-    if [[ ${RBAC_ENABLED} -eq 1 ]] ; then
+    if [[ ${AUTHN} -eq "rbac" ]] ; then
         export EXTERNAL_PORT=$(( LISTENERS_PORT + 100 ))
         export REPLICATION_PORT=$(( LISTENERS_PORT + 200 ))
         export TOKEN_PORT=$(( LISTENERS_PORT + 300 ))
@@ -90,7 +100,7 @@ EchoVars() {
     MyEcho "INFO" "JOLOKIA_PORT="${JOLOKIA_PORT}
     MyEcho "INFO" "JMX_PORT="${JMX_PORT}
     MyEcho "INFO" "LISTENERS_PORT="${LISTENERS_PORT}
-    if [[ ${RBAC_ENABLED} -eq 1 ]] ; then
+    if [[ ${AUTHN} -eq "rbac" ]] ; then
         MyEcho "INFO" "EXTERNAL_PORT="${EXTERNAL_PORT}
         MyEcho "INFO" "REPLICATION_PORT="${REPLICATION_PORT}
         MyEcho "INFO" "TOKEN_PORT="${TOKEN_PORT}
@@ -105,8 +115,8 @@ EchoVars() {
     MyEcho "INFO" "CFG_DIR="${CFG_DIR}
     MyEcho "INFO" "JAR_DIR="${JAR_DIR}
     MyEcho "INFO" "PROP_DIR="${PROP_DIR}
-    MyEcho "INFO" "RBAC_ENABLED="${RBAC_ENABLED}
     MyEcho "INFO" "HEALTHPLUS_ENABLED="${HEALTHPLUS_ENABLED}
+    MyEcho "INFO" "AUTHN="${AUTHN}
     MyEcho "INFO" "NOHUP="${NOHUP}
     MyEcho "INFO" "####################"
     MyEcho "INFO" "End All Vars"
@@ -117,11 +127,7 @@ EchoVars() {
 
 # Generate properties
 GenerateProperties() {
-    if [[ ${RBAC_ENABLED} -eq 1 ]] ; then
-        RunJ2 ${J2_DIR}/server-rbac.properties.j2 ${CFG_DIR}/server_rbac_${BROKER_ID}.properties
-    else
-        RunJ2 ${J2_DIR}/server.properties.j2 ${CFG_DIR}/server_${BROKER_ID}.properties
-    fi
+    RunJ2 ${J2_DIR}/server-${AUTHN}.properties.j2 ${CFG_DIR}/server_${BROKER_ID}.properties
     RunJ2 ${J2_DIR}/jolokia.properties.j2 ${CFG_DIR}/kafka_jolokia_${BROKER_ID}.properties
     RunJ2 ${J2_DIR}/log4j.properties.j2 ${CFG_DIR}/log4j_${BROKER_ID}.properties
 }
@@ -131,12 +137,12 @@ ProcessArgs() {
     POSITIONAL_ARGS=()
 
     export DC_ID=1
-    export RBAC_ENABLED=0
     export REPLICATION_FACTOR=1
     export BROKER_ID=0
     export MIN_ISR=1
     export NOHUP=0
     export HEALTHPLUS_ENABLED=0
+    export AUTHN=no
 
     export PROG_NAME=$0
     if [[ $# -eq 0 ]]; then
@@ -145,6 +151,11 @@ ProcessArgs() {
 
     while [[ $# -gt 0 ]]; do
     case $1 in
+        -a|--authn)
+        export AUTHN=`echo $2 | tr '[:upper:]' '[:lower:]'`
+        shift # past argument
+        shift # past value
+        ;;
         -b|--broker-id)
         export BROKER_ID="$2"
         shift # past argument
@@ -164,10 +175,6 @@ ProcessArgs() {
         export MIN_ISR="$2"
         shift # past argument
         shift # past value
-        ;;
-        -R|--rbac)
-        export RBAC_ENABLED=1
-        shift # past argument
         ;;
         -H|--health-plus)
         export HEALTHPLUS_ENABLED=1
@@ -206,24 +213,13 @@ main() {
     Validate
     EchoVars
     GenerateProperties
-    if [[ ${RBAC_ENABLED} -eq 1 ]] ; then
-        MyEcho "INFO" "Starting broker ${BROKER_ID} with ${CFG_DIR}/server_rbac_${BROKER_ID}.properties ..."
-        if [[ ${NOHUP} -eq 1 ]] ; then
-            MyEcho "INFO" "nohup ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_rbac_${BROKER_ID}.properties 2>&1 > ${LOG_DIR}/ak_${BROKER_ID}.log &"
-            nohup ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_rbac_${BROKER_ID}.properties 2>&1 > ${LOG_DIR}/ak_${BROKER_ID}.log &
-        else
-            MyEcho "INFO" "${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_rbac_${BROKER_ID}.properties"
-            ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_rbac_${BROKER_ID}.properties
-        fi
+    MyEcho "INFO" "Starting broker ${BROKER_ID} with ${CFG_DIR}/server_${BROKER_ID}.properties ..."
+    if [[ ${NOHUP} -eq 1 ]] ; then
+        MyEcho "INFO" "nohup ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${BROKER_ID}.properties 2>&1 > ${LOG_DIR}/ak_${BROKER_ID}.log &"
+        nohup ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${BROKER_ID}.properties 2>&1 > ${LOG_DIR}/ak_${BROKER_ID}.log &
     else
-        MyEcho "INFO" "Starting broker ${BROKER_ID} with ${CFG_DIR}/server_${BROKER_ID}.properties ..."
-        if [[ ${NOHUP} -eq 1 ]] ; then
-            MyEcho "INFO" "nohup ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${BROKER_ID}.properties 2>&1 > ${LOG_DIR}/ak_${BROKER_ID}.log &"
-            nohup ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${BROKER_ID}.properties 2>&1 > ${LOG_DIR}/ak_${BROKER_ID}.log &
-        else
-            MyEcho "INFO" "${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${BROKER_ID}.properties"
-            ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${BROKER_ID}.properties
-        fi
+        MyEcho "INFO" "${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${BROKER_ID}.properties"
+        ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${BROKER_ID}.properties
     fi
 }
 
