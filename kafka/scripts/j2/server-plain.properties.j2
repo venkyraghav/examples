@@ -241,3 +241,8 @@ confluent.metrics.reporter.sasl.mechanism=PLAIN
 confluent.metrics.reporter.security.protocol=SASL_PLAINTEXT
 confluent.metrics.reporter.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="metrics" password="metrics-secret";
 {% endif -%}
+
+
+confluent.tier.metadata.replication.factor={{ REPLICATION_FACTOR }}
+quotas.topic.replication.factor={{ REPLICATION_FACTOR }}
+confluent.cluster.link.metadata.topic.replication.factor={{ REPLICATION_FACTOR }}

@@ -234,6 +234,8 @@ ProcessArgs() {
 
 # Main function
 main() {
+    echo "Not implemented yet"
+    exit 1
     ProcessArgs $@
     ExportVars
     Validate

@@ -118,3 +118,8 @@ confluent.telemetry.enabled=true
 confluent.telemetry.api.key=<HEALTHPLUS-API-KEY>
 confluent.telemetry.api.secret=<HEALTHPLUS-SECRET>
 {% endif -%}
+
+
+confluent.tier.metadata.replication.factor={{ REPLICATION_FACTOR }}
+quotas.topic.replication.factor={{ REPLICATION_FACTOR }}
+confluent.cluster.link.metadata.topic.replication.factor={{ REPLICATION_FACTOR }}

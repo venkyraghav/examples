@@ -9,7 +9,7 @@ Usage() {
     echo "  -m|--min-isr: min isr (default: 1)"
     echo "  -H|--health-plus: enable health+ (default: false)"
     echo "  -n|--nohup: run in background (default: false)"
-    echo "  -a|--auth: authn method. Values no, plain, scram, gssapi, rbac (default: no)"
+    echo "  -a|--auth: authn method. Values noauth, plain, scram, gssapi, rbac (default: noauth)"
     echo "  -h|--help: print help"
 }
 

@@ -160,6 +160,7 @@ RunProcess() {
     if [[ ${DRY_RUN} -eq 0 ]] ; then
         nohup ${SCRIPT_DIR}/start_zk 2>&1 > ${LOG_DIR}/zk.log &
     fi
+    
     DC_ITER=1
     while [[ ${DC_ITER} -le ${NUM_DC} ]]
     do
@@ -178,6 +179,14 @@ RunProcess() {
         done
         DC_ITER=$(( ${DC_ITER} + 1 ))
     done
+
+    MyEcho "INFO" "Sleeping 5 secs ..."
+    sleep 5
+    MyEcho "INFO" "Starting Control Center nohup ${SCRIPT_DIR}/start_c3 --replication-factor ${REPLICATION_FACTOR} --authn ${AUTHN} --nohup 2>&1 > ${LOG_DIR}/c3.log ..."
+    if [[ ${DRY_RUN} -eq 0 ]] ; then
+        nohup ${SCRIPT_DIR}/start_c3 --replication-factor ${REPLICATION_FACTOR} --authn ${AUTHN} --nohup 2>&1 > ${LOG_DIR}/c3.log &
+    fi
+
 }
 
 LoadState() {

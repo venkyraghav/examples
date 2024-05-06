@@ -15,14 +15,14 @@
 
 # Unspecified loggers and loggers with additivity=true output to server.log and stdout
 # Note that INFO only applies to unspecified loggers, the log level of the child logger is used otherwise
-log4j.rootLogger=INFO, stdout, kafkaAppender, myAppender
+log4j.rootLogger=INFO, stdout, kafkaAppender
 
 
-log4j.appender.myAppender=org.apache.log4j.DailyRollingFileAppender
-log4j.appender.myAppender.DatePattern='.'yyyy-MM-dd-HH
-log4j.appender.myAppender.File=${kafka.logs.dir}/my_{{ ID }}.log
-log4j.appender.myAppender.layout=org.apache.log4j.PatternLayout
-log4j.appender.myAppender.layout.ConversionPattern=[%d] %p %m (%c)%n
+# log4j.appender.myAppender=org.apache.log4j.DailyRollingFileAppender
+# log4j.appender.myAppender.DatePattern='.'yyyy-MM-dd-HH
+# log4j.appender.myAppender.File=${kafka.logs.dir}/my_{{ ID }}.log
+# log4j.appender.myAppender.layout=org.apache.log4j.PatternLayout
+# log4j.appender.myAppender.layout.ConversionPattern=[%d] %p %m (%c)%n
 
 log4j.appender.stdout=org.apache.log4j.ConsoleAppender
 log4j.appender.stdout.layout=org.apache.log4j.PatternLayout

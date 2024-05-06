@@ -1,11 +1,178 @@
 #!/bin/bash
 
-# export CONTROL_CENTER_LOG4J_OPTS="-Dkafka.logs.dir=/Users/venky/_official/cp/data/logs -Dlog4j.configuration=file:///Users/venky/_official/cp/config/genconfig/log4j_zk.properties"
+# Usage
+Usage() {
+    echo "Usage: ${PROG_NAME} "
+    echo "  -r|--replication-factor: replication factor (default: 1)"
+    echo "  -H|--health-plus: enable health+ (default: false)"
+    echo "  -n|--nohup: run in background (default: false)"
+    echo "  -a|--auth: authn method. Values noauth, plain, scram, gssapi, rbac (default: noauth)"
+    echo "  -h|--help: print help"
+}
 
-export CONTROL_CENTER_OPTS="-DVENKY.LOCAL -Dnode=C3"
-# CONTROL_CENTER_JMX_OPTS="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
-# CONTROL_CENTER_JMX_OPTS="${CONTROL_CENTER_JMX_OPTS} -javaagent:/Users/venky/_official/config/kafka/jolokia-jvm.jar=config=/Users/venky/_official/config/kafka/zk_jolokia.properties"
-# CONTROL_CENTER_JMX_OPTS="${CONTROL_CENTER_JMX_OPTS} -javaagent:/Users/venky/_official/config/kafka/jmx_prometheus_javaagent-0.16.1.jar=8080:/Users/venky/github.com/confluentinc/jmx-monitoring-stacks/shared-assets/jmx-exporter/zookeeper.yml"
-# CONTROL_CENTER_JMX_OPTS="-Djava.net.preferIPv4Stack=true"
-# export CONTROL_CENTER_JMX_OPTS
-control-center-start /Users/venky/_official/cp/script/control-center.properties
+# Validate
+Validate() {
+    if [[ ${REPLICATION_FACTOR} -lt ${MIN_ISR} ]] ; then
+        MyEcho "ERROR" "replication factor must be greater than or equal to min isr"
+        Usage
+        exit 1
+    fi
+    case ${AUTHN} in
+        noauth|plain|scram|gssapi|rbac)
+        export AUTHN
+        ;;
+        *)
+        MyEcho "ERROR" "Unknown value ${AUTHN} for option -a or --authn"
+        Usage
+        exit 1
+        ;;
+    esac
+}
+
+# Export vars
+ExportVars() {
+    export MY_IP=$(ifconfig en0 | grep inet | awk '$1=="inet" {print $2}')
+
+    CONFLUENT_HTTP_SERVER_LISTENERS=8090
+    export CONFLUENT_HTTP_SERVER_LISTENERS=$(( CONFLUENT_HTTP_SERVER_LISTENERS + 1 ))
+
+    LISTENERS_PORT=9090
+    export LISTENERS_PORT=$(( LISTENERS_PORT + 1 ))
+    if [[ ${AUTHN} -eq "rbac" ]] ; then
+        export EXTERNAL_PORT=$(( LISTENERS_PORT + 100 ))
+        export REPLICATION_PORT=$(( LISTENERS_PORT + 200 ))
+        export TOKEN_PORT=$(( LISTENERS_PORT + 300 ))
+    fi
+
+    export CONTROL_CENTER_OPTS="-DVENKY.LOCAL -Dnode=C3"
+
+    # CONTROL_CENTER_JMX_OPTS="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.host=${MY_IP} -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+    # CONTROL_CENTER_JMX_OPTS="${CONTROL_CENTER_JMX_OPTS} -Djava.rmi.server.hostname=${MY_IP}"
+    # CONTROL_CENTER_JMX_OPTS="${CONTROL_CENTER_JMX_OPTS} -Djava.net.preferIPv4Stack=true"
+    # CONTROL_CENTER_JMX_OPTS="${CONTROL_CENTER_JMX_OPTS} -javaagent:${JAR_DIR}/jolokia-jvm-1.6.2-agent.jar=config=${CFG_DIR}/c3_jolokia.properties"
+    # CONTROL_CENTER_JMX_OPTS="${CONTROL_CENTER_JMX_OPTS} -javaagent:${JAR_DIR}/jmx_prometheus_javaagent-0.16.1.jar=${JMX_PORT}:${PROP_DIR}/kafka_streams.yml"
+    # export CONTROL_CENTER_JMX_OPTS
+    export CONTROL_CENTER_JMX_OPTS="-Djava.net.preferIPv4Stack=true"
+    MyEcho "INFO" "CONTROL_CENTER_JMX_OPTS=${CONTROL_CENTER_JMX_OPTS}"
+
+    export CONTROL_CENTER_LOG4J_OPTS="-Dlog.dir=${LOG_DIR} -Dlog.name=c3.log -Dlog4j.configuration=file://${PROP_DIR}/log4j-rolling.properties"
+}
+
+# Echo vars
+EchoVars() {
+    echo ""
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "Begin All Vars"
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "PROG_NAME="${PROG_NAME}
+    MyEcho "INFO" "REPLICATION_FACTOR="${REPLICATION_FACTOR}
+    MyEcho "INFO" "CONFLUENT_HTTP_SERVER_LISTENERS="${CONFLUENT_HTTP_SERVER_LISTENERS}
+    MyEcho "INFO" "LISTENERS_PORT="${LISTENERS_PORT}
+    if [[ ${AUTHN} -eq "rbac" ]] ; then
+        MyEcho "INFO" "EXTERNAL_PORT="${EXTERNAL_PORT}
+        MyEcho "INFO" "REPLICATION_PORT="${REPLICATION_PORT}
+        MyEcho "INFO" "TOKEN_PORT="${TOKEN_PORT}
+    fi
+
+    MyEcho "INFO" "CONTROL_CENTER_OPTS="${CONTROL_CENTER_OPTS}
+    # MyEcho "INFO" "CONTROL_CENTER_OPTS="${CONTROL_CENTER_JMX_OPTS}
+    MyEcho "INFO" "CONTROL_CENTER_LOG4J_OPTS="${CONTROL_CENTER_LOG4J_OPTS}
+
+    MyEcho "INFO" "LOG_DIR="${LOG_DIR}
+    MyEcho "INFO" "DATA_DIR="${DATA_DIR}
+    MyEcho "INFO" "CFG_DIR="${CFG_DIR}
+    MyEcho "INFO" "JAR_DIR="${JAR_DIR}
+    MyEcho "INFO" "PROP_DIR="${PROP_DIR}
+    MyEcho "INFO" "HEALTHPLUS_ENABLED="${HEALTHPLUS_ENABLED}
+    MyEcho "INFO" "AUTHN="${AUTHN}
+    MyEcho "INFO" "NOHUP="${NOHUP}
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "End All Vars"
+    MyEcho "INFO" "####################"
+    echo ""
+    echo ""
+}
+
+# Generate properties
+GenerateProperties() {
+    RunJ2 ${J2_DIR}/control-center-${AUTHN}.properties.j2 ${CFG_DIR}/control-center.properties
+}
+
+# Process args
+ProcessArgs() {
+    POSITIONAL_ARGS=()
+
+    export REPLICATION_FACTOR=1
+    export NOHUP=0
+    export HEALTHPLUS_ENABLED=0
+    export AUTHN=no
+
+    export PROG_NAME=$0
+    if [[ $# -eq 0 ]]; then
+        return
+    fi
+
+    while [[ $# -gt 0 ]]; do
+    case $1 in
+        -a|--authn)
+        export AUTHN=`echo $2 | tr '[:upper:]' '[:lower:]'`
+        shift # past argument
+        shift # past value
+        ;;
+        -r|--replication-factor)
+        export REPLICATION_FACTOR="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -H|--health-plus)
+        export HEALTHPLUS_ENABLED=1
+        shift # past argument
+        ;;
+        -n|--nohup)
+        export NOHUP=1
+        shift # past argument
+        ;;
+        -h|--help)
+        MyEcho "INFO" "Printing help"
+        Usage
+        exit 0
+        ;;
+        -*|--*)
+        MyEcho "ERROR" "Unknown option $1"
+        Usage
+        exit 1
+        ;;
+        *)
+        POSITIONAL_ARGS+=("$1") # save positional arg
+        shift # past argument
+        ;;
+    esac
+    done
+
+    set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+}
+
+# Main function
+main() {
+    source ${base_dir}/common
+    Precheck
+    ProcessArgs $@
+    ExportVars
+    Validate
+    EchoVars
+    GenerateProperties
+    MyEcho "INFO" "Starting C3  ${CFG_DIR}/control-center.properties ..."
+    if [[ ${NOHUP} -eq 1 ]] ; then
+        MyEcho "INFO" "nohup ${CONFLUENT_HOME}/bin/control-center-start ${CFG_DIR}/control-center.properties 2>&1 > ${LOG_DIR}/c3.log &"
+        nohup ${CONFLUENT_HOME}/bin/control-center-start ${CFG_DIR}/control-center.properties 2>&1 > ${LOG_DIR}/c3.log &
+    else
+        MyEcho "INFO" "${CONFLUENT_HOME}/bin/control-center-start ${CFG_DIR}/control-center.properties"
+        ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${BROKER_ID}.properties
+    fi
+}
+
+######################################################################
+# Main Processing Starts Here
+######################################################################
+base_dir=$(dirname $0)
+main $@
