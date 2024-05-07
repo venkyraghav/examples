@@ -102,7 +102,7 @@ ExportVars() {
        echo "RBAC_ENABLED="${RBAC_ENABLED}
     fi
 
-    export SCHEMA_REGISTRY_OPTS="-DVENKY.LOCAL -Dnode=SR${SR_ID}"
+    export SCHEMA_REGISTRY_OPTS="-D${ENV_NAME} -Dnode=SR${SR_ID}"
 
     SCHEMA_REGISTRY_JMX_OPTS="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
     SCHEMA_REGISTRY_JMX_OPTS="${SCHEMA_REGISTRY_JMX_OPTS} -javaagent:${JOLOKIA_ASSETS_DIR}/jolokia-jvm-1.6.2-agent.jar=config=${GEN_CFG_DIR}/schema-registry_jolokia_${SR_ID}.properties"

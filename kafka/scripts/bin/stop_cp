@@ -1,29 +1,222 @@
 #!/bin/bash
 
+
+#!/bin/bash
+
+# Usage
+Usage() {
+    echo "Usage: ${PROG_NAME} "
+    echo "  -D|--dry-run: perform dry run (default: false)"
+    echo "  -c|--components: Components to stop takes care of dependency. Values all, zk, ak, sr, rest, connect ksql, c3 (default: all)"
+    echo "  -h|--help: print help"
+}
+
+MyEcho() {
+    echo [`date +"%Y-%m-%d %H:%M:%S"`] $1 $2
+}
+
+GenerateDependency() {
+    STOP_ZK=0
+    STOP_AK=0
+    STOP_SR=0
+    STOP_REST=0
+    STOP_KSQL=0
+    STOP_CONNECT=0
+    STOP_C3=0
+    comparg=${COMPONENTS}
+    OLDIFS="$IFS"
+    for comp in ${COMPONENTS}
+    do
+        case ${COMPONENTS} in
+        all|zk)
+            STOP_ZK=1
+            STOP_AK=1
+            STOP_SR=1
+            STOP_REST=1
+            STOP_KSQL=1
+            STOP_CONNECT=1
+            STOP_C3=1
+            break
+            ;;
+        c3)
+            STOP_C3=1
+            ;;
+        ak)
+            STOP_AK=1
+            STOP_SR=1
+            STOP_REST=1
+            STOP_KSQL=1
+            STOP_CONNECT=1
+            STOP_C3=1
+            ;;
+        sr)
+            STOP_SR=1
+            STOP_REST=1
+            STOP_KSQL=1
+            STOP_CONNECT=1
+            STOP_C3=1
+            ;;
+        rest)
+            STOP_REST=1
+            STOP_C3=1
+            ;;
+        ksql)
+            STOP_KSQL=1
+            STOP_C3=1
+            ;;
+        connect)
+            STOP_CONNECT=1
+            STOP_C3=1
+            ;;
+        esac
+    done
+    IFS=${OLDIFS}
+}
+
+# Validate
+Validate() {
+    case ${COMPONENTS} in
+        all|ak|zk|sr|rest|ksql|connect|c3)
+        export COMPONENTS
+        ;;
+        *)
+        MyEcho "ERROR" "Unknown value ${COMPONENTS} for option -c or --components"
+        Usage
+        exit 1
+        ;;
+    esac
+}
+
+# Echo vars
+EchoVars() {
+    echo ""
+    echo ""
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "Begin All Vars"
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "PROG_NAME="${PROG_NAME}
+    MyEcho "INFO" "FRESH="${FRESH}
+    MyEcho "INFO" "DRY_RUN="${DRY_RUN}
+    MyEcho "INFO" "COMPONENTS="${COMPONENTS}
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "End All Vars"
+    MyEcho "INFO" "####################"
+    echo ""
+    echo ""
+}
+
+# Process args
+ProcessArgs() {
+    POSITIONAL_ARGS=()
+
+    PROG_NAME=$0
+    DRY_RUN=0
+    COMPONENTS=all
+
+    if [[ $# -eq 0 ]]; then
+        return
+    fi
+
+    while [[ $# -gt 0 ]]; do
+    case $1 in
+        -c|--components)
+        export COMPONENTS="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -D|--dry-run)
+        export DRY_RUN=1
+        shift # past argument
+        ;;
+        -h|--help)
+        MyEcho "INFO" "Printing help"
+        Usage
+        exit 0
+        ;;
+        -*|--*)
+        MyEcho "ERROR" "Unknown option $1"
+        Usage
+        exit 1
+        ;;
+        *)
+        POSITIONAL_ARGS+=("$1") # save positional arg
+        shift # past argument
+        ;;
+    esac
+    done
+
+    set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+}
+
+StopProcess() {
+    pidtype=$1
+    PATTERN="\-D${ENV_NAME} \-Dnode=${pidtype}"
+    num=`ps -ef|grep java|grep "${PATTERN}"|grep -v grep|awk '{print $2}'|wc -l|sed 's/ //g'`
+    if [[ ${num} -gt 0 ]]; then
+        MyEcho "INFO" "Start kill all ${pidtype} ..."
+        while [[ ${num} -gt 0 ]]; do
+            for pid in `ps -ef|grep java|grep "${PATTERN}"|grep -v grep|awk '{print $2}'`
+            do
+                MyEcho "INFO" "Kill ${pidtype} PID ${pid}"
+                if [[ ${DRY_RUN} -eq 0 ]] ; then
+                    kill ${pid}
+                    sleep 5
+                fi
+            done
+            if [[ ${DRY_RUN} -eq 0 ]] ; then
+                num=`ps -ef|grep java|grep "${PATTERN}"|grep -v grep|awk '{print $2}'|wc -l|sed 's/ //g'`
+            else
+                num=0
+            fi
+        done
+        MyEcho "INFO" "Done kill all ${pidtype} ..."
+    else
+        MyEcho "INFO" "No ${pidtype} to kill..."
+    fi
+}
+
+RunProcess() {
+    MyEcho "WARN" "TODO Does not identify contoller (to be killed last)"
+
+    GenerateDependency ${COMPONENTS}
+
+    if [[ ${STOP_C3} -eq 1 ]] ; then
+        StopProcess "C3"
+    fi
+
+    if [[ ${STOP_CONNECT} -eq 1 ]] ; then
+        StopProcess "CONNECT"
+    fi
+
+    if [[ ${STOP_KSQL} -eq 1 ]] ; then
+        StopProcess "KSQL"
+    fi
+
+    if [[ ${STOP_REST} -eq 1 ]] ; then
+        StopProcess "REST"
+    fi
+
+    if [[ ${STOP_SR} -eq 1 ]] ; then
+        StopProcess "SR"
+    fi
+
+    if [[ ${STOP_AK} -eq 1 ]] ; then
+        StopProcess "AK"
+    fi
+
+    if [[ ${STOP_ZK} -eq 1 ]] ; then
+        StopProcess "ZK"
+    fi
+}
+
 # Main function
 main() {
     source ${base_dir}/common
-    MyEcho "WARN" "TODO Does not identify contoller (to be killed last)"
-
-    for pidtype in `echo C3 CONNECT REST SR AK ZK`
-    do
-        num=`ps -ef|grep ${ENV_NAME} |grep "node=${pidtype}" |grep -v grep |awk '{print $2}'|wc -l`
-        if [[ ${num} -gt 0 ]]; then
-            MyEcho "INFO" "Start kill all ${pidtype} ..."
-            while [[ ${num} -gt 0 ]]; do
-                for pid in `ps -ef|grep ${ENV_NAME} |grep "node=${pidtype}" |grep -v grep |awk '{print $2}'`
-                do
-                    MyEcho "INFO" "Kill ${pidtype} PID ${pid}"
-                    kill ${pid}
-                    sleep 5
-                done
-                num=`ps -ef|grep ${ENV_NAME} |grep "node=${pidtype}" |grep -v grep |awk '{print $2}'|wc -l`
-            done
-            MyEcho "INFO" "Done kill all ${pidtype} ..."
-        else
-            MyEcho "INFO" "No ${pidtype} to kill..."
-        fi
-    done
+    Precheck
+    ProcessArgs $@
+    Validate
+    EchoVars
+    RunProcess
 }
 
 ######################################################################

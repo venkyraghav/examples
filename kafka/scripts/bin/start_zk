@@ -8,7 +8,7 @@ ExportVars() {
     export JMX_PORT=8080
     export JOLOKIA_PORT=7770
 
-    export KAFKA_OPTS="-DVENKY.LOCAL -Dnode=ZK"
+    export KAFKA_OPTS="-D${ENV_NAME} -Dnode=ZK"
 
     KAFKA_JMX_OPTS="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.host=${MY_IP} -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
     KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS} -Djava.rmi.server.hostname=${MY_IP}"

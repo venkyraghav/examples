@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ENV_NAME=VENKY.LOCAL
+ENV_NAME=MY.LOCAL
 
 MyEcho() {
     echo [`date +"%Y-%m-%d %H:%M:%S"`] $1 $2

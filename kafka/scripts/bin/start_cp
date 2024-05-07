@@ -4,7 +4,7 @@
 Usage() {
     echo "Usage: ${PROG_NAME} "
     echo "  -D|--dry-run: perform dry run (default: false)"
-    echo "  -c|--components: Components to start takes care of dependency. Values all, zk, ak, sr, rest, connect ksql, c3 (default: all)"
+    echo "  -c|--components: Components to start takes care of dependency. Values all, zk, ak, sr, rest, connect ksql, c3, c3only (default: all)"
     echo "  -f|--fresh: create fresh cluster (default: false)"
     echo "  -d|--num-dc: number of data centers (default: 1)"
     echo "  -n|--num-broker: number of brokers per DC (default: 1)"
@@ -41,6 +41,10 @@ GenerateDependency() {
     for comp in ${COMPONENTS}
     do
         case ${COMPONENTS} in
+        c3only)
+            START_C3=1
+            break
+            ;;
         all|c3)
             START_ZK=1
             START_AK=1
@@ -116,8 +120,13 @@ Validate() {
         fi
     fi
     case ${AUTHN} in
-        noauth|plain|scram|gssapi|rbac)
+        noauth|plain)
         export AUTHN
+        ;;
+        scram|gssapi|rbac)
+        MyEcho "ERROR" "Unsupported ${AUTHN} for option -a or --authn. Scripts needs to enhanced"
+        Usage
+        exit 1
         ;;
         *)
         MyEcho "ERROR" "Unknown value ${AUTHN} for option -a or --authn"
@@ -133,7 +142,7 @@ Validate() {
     fi
 
     case ${COMPONENTS} in
-        all|ak|zk|sr|rest|ksql|connect|c3)
+        all|ak|zk|sr|rest|ksql|connect|c3|c3only)
         export COMPONENTS
         ;;
         *)
@@ -142,8 +151,6 @@ Validate() {
         exit 1
         ;;
     esac
-
-    MyEcho "INFO" "TODO validate for component start order"
 }
 
 # Echo vars
@@ -182,6 +189,7 @@ ProcessArgs() {
     NOHUP=1
     DRY_RUN=0
     AUTHN=noauth
+    COMPONENTS=all
 
     if [[ $# -eq 0 ]]; then
         return
@@ -349,7 +357,7 @@ LoadState() {
 
 CheckState() {
     if [[ -z "${DC0}" ]] ; then
-        MyEcho "ERROR" "NO DC in ${STATE_FILE}"
+        MyEcho "INFO" "NO DC in ${STATE_FILE}. Doing fresh install ..."
         # No info from .state file
         return
     fi

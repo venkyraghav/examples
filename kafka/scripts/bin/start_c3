@@ -44,7 +44,7 @@ ExportVars() {
         export TOKEN_PORT=$(( LISTENERS_PORT + 300 ))
     fi
 
-    export CONTROL_CENTER_OPTS="-DVENKY.LOCAL -Dnode=C3"
+    export CONTROL_CENTER_OPTS="-D${ENV_NAME} -Dnode=C3"
 
     # CONTROL_CENTER_JMX_OPTS="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.host=${MY_IP} -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
     # CONTROL_CENTER_JMX_OPTS="${CONTROL_CENTER_JMX_OPTS} -Djava.rmi.server.hostname=${MY_IP}"
