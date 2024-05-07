@@ -51,11 +51,11 @@ listener.name.sasl_plain.plain.sasl.enabled.mechanisms=PLAIN
 listener.name.sasl_plain.plain.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required \
    username="admin" password="admin-secret" \
    user_admin="admin-secret" user_kafkabroker1="kafkabroker1-secret" user_metrics="metrics-secret" \
-   user_client1="client1-secret" user_client2="client2-secret";
+   user_c3="c3-secret" user_client1="client1-secret" user_client2="client2-secret";
 
 authorizer.class.name=kafka.security.authorizer.AclAuthorizer
 
-super.users=User:admin;User:kafkabroker1;User:metrics
+super.users=User:admin;User:kafkabroker1;User:metrics;User:c3
 allow.everyone.if.no.acl.found=false
 
 # The number of threads that the server uses for receiving requests from the network and sending responses to the network

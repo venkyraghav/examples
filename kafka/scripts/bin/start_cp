@@ -4,6 +4,7 @@
 Usage() {
     echo "Usage: ${PROG_NAME} "
     echo "  -D|--dry-run: perform dry run (default: false)"
+    echo "  -c|--components: Components to start takes care of dependency. Values all, zk, ak, sr, rest, connect ksql, c3 (default: all)"
     echo "  -f|--fresh: create fresh cluster (default: false)"
     echo "  -d|--num-dc: number of data centers (default: 1)"
     echo "  -n|--num-broker: number of brokers per DC (default: 1)"
@@ -13,6 +14,79 @@ Usage() {
 
 MyEcho() {
     echo [`date +"%Y-%m-%d %H:%M:%S"`] $1 $2
+}
+
+CheckRunning() {
+    PATTERN="\-D${ENV_NAME} \-Dnode="
+    RUNNING_ZK=`ps -ef|grep java|grep "${PATTERN}ZK"|grep -v grep|awk '{print $2}'|wc -l|sed 's/ //g'`
+    RUNNING_AK=`ps -ef|grep java|grep "${PATTERN}AK"|grep -v grep|awk '{print $2}'|wc -l|sed 's/ //g'`
+    RUNNING_SR=`ps -ef|grep java|grep "${PATTERN}SR"|grep -v grep|awk '{print $2}'|wc -l|sed 's/ //g'`
+    RUNNING_REST=`ps -ef|grep java|grep "${PATTERN}REST"|grep -v grep|awk '{print $2}'|wc -l|sed 's/ //g'`
+    RUNNING_KSQL=`ps -ef|grep java|grep "${PATTERN}KSQL"|grep -v grep|awk '{print $2}'|wc -l|sed 's/ //g'`
+    RUNNING_CONNECT=`ps -ef|grep java|grep "${PATTERN}CONNECT"|grep -v grep|awk '{print $2}'|wc -l|sed 's/ //g'`
+    RUNNING_C3=`ps -ef|grep java|grep "${PATTERN}C3"|grep -v grep|awk '{print $2}'|wc -l|sed 's/ //g'`
+    RUNNING_CP=$(( $RUNNING_AK + $RUNNING_C3 + $RUNNING_CONNECT + $RUNNING_CP + $RUNNING_KSQL + $RUNNING_REST + $RUNNING_SR + $RUNNING_ZK ))
+}
+
+GenerateDependency() {
+    START_ZK=0
+    START_AK=0
+    START_SR=0
+    START_REST=0
+    START_KSQL=0
+    START_CONNECT=0
+    START_C3=0
+    comparg=${COMPONENTS}
+    OLDIFS="$IFS"
+    for comp in ${COMPONENTS}
+    do
+        case ${COMPONENTS} in
+        all|c3)
+            START_ZK=1
+            START_AK=1
+            START_SR=1
+            START_REST=1
+            START_KSQL=1
+            START_CONNECT=1
+            START_C3=1
+            break
+            ;;
+        zk)
+            START_ZK=1
+            ;;
+        ak)
+            START_ZK=1
+            START_AK=1
+            ;;
+        sr)
+            START_ZK=1
+            START_AK=1
+            START_SR=1
+            ;;
+        rest)
+            START_ZK=1
+            START_AK=1
+            START_SR=1
+            START_REST=1
+            ;;
+        ksql)
+            START_ZK=1
+            START_AK=1
+            START_SR=1
+            START_REST=1
+            START_KSQL=1
+            ;;
+        connect)
+            START_ZK=1
+            START_AK=1
+            START_SR=1
+            START_REST=1
+            START_KSQL=1
+            START_CONNECT=1
+            ;;
+        esac
+    done
+    IFS=${OLDIFS}
 }
 
 # Validate
@@ -52,6 +126,24 @@ Validate() {
         ;;
     esac
 
+    CheckRunning
+    if [[ ${FRESH} -eq 1 && ${RUNNING_CP} -gt 0 ]] ; then
+        MyEcho "ERROR" "Some CP process is running. Run stop_cp prior to starting FRESH CP"
+        exit 1
+    fi
+
+    case ${COMPONENTS} in
+        all|ak|zk|sr|rest|ksql|connect|c3)
+        export COMPONENTS
+        ;;
+        *)
+        MyEcho "ERROR" "Unknown value ${COMPONENTS} for option -c or --components"
+        Usage
+        exit 1
+        ;;
+    esac
+
+    MyEcho "INFO" "TODO validate for component start order"
 }
 
 # Echo vars
@@ -69,6 +161,7 @@ EchoVars() {
     MyEcho "INFO" "MIN_ISR="${MIN_ISR}
     MyEcho "INFO" "REPLICATION_FACTOR="${REPLICATION_FACTOR}
     MyEcho "INFO" "AUTHN="${AUTHN}
+    MyEcho "INFO" "COMPONENTS="${COMPONENTS}
     MyEcho "INFO" "####################"
     MyEcho "INFO" "End All Vars"
     MyEcho "INFO" "####################"
@@ -98,6 +191,11 @@ ProcessArgs() {
     case $1 in
         -n|--num-broker)
         export NUM_BROKER="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -c|--components)
+        export COMPONENTS="$2"
         shift # past argument
         shift # past value
         ;;
@@ -156,37 +254,90 @@ RunProcess() {
     mkdir -p ${LOG_DIR}
     mkdir -p ${DATA_DIR}
 
-    MyEcho "INFO" "Starting ZooKeeper nohup ${SCRIPT_DIR}/start_zk 2>&1 > ${LOG_DIR}/zk.log ..."
-    if [[ ${DRY_RUN} -eq 0 ]] ; then
-        nohup ${SCRIPT_DIR}/start_zk 2>&1 > ${LOG_DIR}/zk.log &
+
+    GenerateDependency ${COMPONENTS}
+
+    if [[ ${START_ZK} -eq 1 && ${RUNNING_ZK} -eq 0 ]] ; then
+        MyEcho "INFO" "Starting ZooKeeper nohup ${SCRIPT_DIR}/start_zk 2>&1 > ${LOG_DIR}/zk.log ..."
+        if [[ ${DRY_RUN} -eq 0 ]] ; then
+            nohup ${SCRIPT_DIR}/start_zk 2>&1 > ${LOG_DIR}/zk.log &
+        fi
+        MyEcho "INFO" "Started ZK. Sleeping 5 secs ..."
+        sleep 5
     fi
     
-    DC_ITER=1
-    while [[ ${DC_ITER} -le ${NUM_DC} ]]
-    do
-        DC_ID=${DC_ITER}
-        BROKER_ITER=1
-        while [[ ${BROKER_ITER} -le ${NUM_BROKER} ]]
+    if [[ ${START_AK} -eq 1 && ${RUNNING_AK} -eq 0 ]] ; then
+        DC_ITER=1
+        while [[ ${DC_ITER} -le ${NUM_DC} ]]
         do
-            BROKER_ID=${BROKER_ITER}
-            MyEcho "INFO" "Sleeping 5 secs ..."
-            sleep 5
-            MyEcho "INFO" "Starting Broker ${SCRIPT_DIR}/start_ak --replication-factor ${REPLICATION_FACTOR} --min-isr ${MIN_ISR} --broker-id ${BROKER_ID} --dc-id ${DC_ID} --authn ${AUTHN} --nohup ..."
-            if [[ ${DRY_RUN} -eq 0 ]] ; then
-                ${SCRIPT_DIR}/start_ak --replication-factor ${REPLICATION_FACTOR} --min-isr ${MIN_ISR} --broker-id ${BROKER_ID} --dc-id ${DC_ID} --authn ${AUTHN} --nohup
-            fi
-            BROKER_ITER=$(( ${BROKER_ITER} + 1 ))
+            DC_ID=${DC_ITER}
+            BROKER_ITER=1
+            while [[ ${BROKER_ITER} -le ${NUM_BROKER} ]]
+            do
+                BROKER_ID=${BROKER_ITER}
+                MyEcho "INFO" "Sleeping 5 secs ..."
+                sleep 5
+                MyEcho "INFO" "Starting Broker ${SCRIPT_DIR}/start_ak --replication-factor ${REPLICATION_FACTOR} --min-isr ${MIN_ISR} --broker-id ${BROKER_ID} --dc-id ${DC_ID} --authn ${AUTHN} --nohup ..."
+                if [[ ${DRY_RUN} -eq 0 ]] ; then
+                    ${SCRIPT_DIR}/start_ak --replication-factor ${REPLICATION_FACTOR} --min-isr ${MIN_ISR} --broker-id ${BROKER_ID} --dc-id ${DC_ID} --authn ${AUTHN} --nohup
+                fi
+                BROKER_ITER=$(( ${BROKER_ITER} + 1 ))
+            done
+            DC_ITER=$(( ${DC_ITER} + 1 ))
         done
-        DC_ITER=$(( ${DC_ITER} + 1 ))
-    done
 
-    MyEcho "INFO" "Sleeping 5 secs ..."
-    sleep 5
-    MyEcho "INFO" "Starting Control Center nohup ${SCRIPT_DIR}/start_c3 --replication-factor ${REPLICATION_FACTOR} --authn ${AUTHN} --nohup 2>&1 > ${LOG_DIR}/c3.log ..."
-    if [[ ${DRY_RUN} -eq 0 ]] ; then
-        nohup ${SCRIPT_DIR}/start_c3 --replication-factor ${REPLICATION_FACTOR} --authn ${AUTHN} --nohup 2>&1 > ${LOG_DIR}/c3.log &
+        MyEcho "INFO" "Started AK. Sleeping 10 secs ..."
+        sleep 10
     fi
 
+    if [[ ${START_SR} -eq 1 && ${RUNNING_SR} -eq 0 ]] ; then
+        MyEcho "INFO" "TODO Start SR"
+        # MyEcho "INFO" "Starting Control Center nohup ${SCRIPT_DIR}/start_c3 --replication-factor ${REPLICATION_FACTOR} --authn ${AUTHN} --nohup 2>&1 > ${LOG_DIR}/c3.log ..."
+        # if [[ ${DRY_RUN} -eq 0 ]] ; then
+        #     nohup ${SCRIPT_DIR}/start_c3 --replication-factor ${REPLICATION_FACTOR} --authn ${AUTHN} --nohup 2>&1 > ${LOG_DIR}/c3.log &
+        # fi
+        # MyEcho "INFO" "Started SR. Sleeping 5 secs ..."
+        # sleep 5
+    fi
+
+    if [[ ${START_REST} -eq 1 && ${RUNNING_REST} -eq 0 ]] ; then
+        MyEcho "INFO" "TODO Start REST"
+        # MyEcho "INFO" "Starting Control Center nohup ${SCRIPT_DIR}/start_c3 --replication-factor ${REPLICATION_FACTOR} --authn ${AUTHN} --nohup 2>&1 > ${LOG_DIR}/c3.log ..."
+        # if [[ ${DRY_RUN} -eq 0 ]] ; then
+        #     nohup ${SCRIPT_DIR}/start_c3 --replication-factor ${REPLICATION_FACTOR} --authn ${AUTHN} --nohup 2>&1 > ${LOG_DIR}/c3.log &
+        # fi
+        # MyEcho "INFO" "Started REST. Sleeping 5 secs ..."
+        # sleep 5
+    fi
+
+    if [[ ${START_KSQL} -eq 1 && ${RUNNING_KSQL} -eq 0 ]] ; then
+        MyEcho "INFO" "TODO Start KSQL"
+        # MyEcho "INFO" "Starting Control Center nohup ${SCRIPT_DIR}/start_c3 --replication-factor ${REPLICATION_FACTOR} --authn ${AUTHN} --nohup 2>&1 > ${LOG_DIR}/c3.log ..."
+        # if [[ ${DRY_RUN} -eq 0 ]] ; then
+        #     nohup ${SCRIPT_DIR}/start_c3 --replication-factor ${REPLICATION_FACTOR} --authn ${AUTHN} --nohup 2>&1 > ${LOG_DIR}/c3.log &
+        # fi
+        # MyEcho "INFO" "Started KSQL. Sleeping 5 secs ..."
+        # sleep 5
+    fi
+
+    if [[ ${START_CONNECT} -eq 1 && ${RUNNING_CONNECT} -eq 0 ]] ; then
+        MyEcho "INFO" "TODO Start CONNECT"
+        # MyEcho "INFO" "Starting Control Center nohup ${SCRIPT_DIR}/start_c3 --replication-factor ${REPLICATION_FACTOR} --authn ${AUTHN} --nohup 2>&1 > ${LOG_DIR}/c3.log ..."
+        # if [[ ${DRY_RUN} -eq 0 ]] ; then
+        #     nohup ${SCRIPT_DIR}/start_c3 --replication-factor ${REPLICATION_FACTOR} --authn ${AUTHN} --nohup 2>&1 > ${LOG_DIR}/c3.log &
+        # fi
+        # MyEcho "INFO" "Started CONNECT. Sleeping 5 secs ..."
+        # sleep 5
+    fi
+
+    if [[ ${START_C3} -eq 1 && ${RUNNING_C3} -eq 0 ]] ; then
+        MyEcho "INFO" "Starting Control Center nohup ${SCRIPT_DIR}/start_c3 --replication-factor ${REPLICATION_FACTOR} --authn ${AUTHN} --nohup 2>&1 > ${LOG_DIR}/c3.log ..."
+        if [[ ${DRY_RUN} -eq 0 ]] ; then
+            nohup ${SCRIPT_DIR}/start_c3 --replication-factor ${REPLICATION_FACTOR} --authn ${AUTHN} --nohup 2>&1 > ${LOG_DIR}/c3.log &
+        fi
+        MyEcho "INFO" "Started C3. Sleeping 5 secs ..."
+        sleep 5
+    fi
 }
 
 LoadState() {

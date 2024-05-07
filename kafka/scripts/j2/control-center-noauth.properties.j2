@@ -1,6 +1,10 @@
 # A comma separated list of Apache Kafka cluster host names (required)
 bootstrap.servers={{ MY_IP }}:9091
 
+confluent.controlcenter.streams.security.protocol=PLAINTEXT
+confluent.controlcenter.kafka.mycluster.bootstrap.servers={{ MY_IP }}:9091
+confluent.controlcenter.kafka.mycluster.security.protocol=PLAINTEXT
+
 # Unique identifier for the Control Center
 confluent.controlcenter.id=1
 

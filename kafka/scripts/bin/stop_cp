@@ -5,7 +5,7 @@ main() {
     source ${base_dir}/common
     MyEcho "WARN" "TODO Does not identify contoller (to be killed last)"
 
-    for pidtype in `echo AK ZK`
+    for pidtype in `echo C3 CONNECT REST SR AK ZK`
     do
         num=`ps -ef|grep ${ENV_NAME} |grep "node=${pidtype}" |grep -v grep |awk '{print $2}'|wc -l`
         if [[ ${num} -gt 0 ]]; then

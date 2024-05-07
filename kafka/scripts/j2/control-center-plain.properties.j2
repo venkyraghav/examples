@@ -1,5 +1,8 @@
 # A comma separated list of Apache Kafka cluster host names (required)
 bootstrap.servers={{ MY_IP }}:9091
+sasl.mechanism=PLAIN
+security.protocol=SASL_PLAINTEXT
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="c3" password="c3-secret";
 
 # Unique identifier for the Control Center
 confluent.controlcenter.id=1
@@ -9,6 +12,22 @@ confluent.controlcenter.data.dir={{ DATA_DIR }}/c3
 
 # Kafka REST endpoint URL
 confluent.controlcenter.streams.cprest.url=http://{{ MY_IP }}:8091
+confluent.controlcenter.streams.bootstrap.servers={{ MY_IP }}:9091
+confluent.controlcenter.streams.sasl.mechanism=PLAIN
+confluent.controlcenter.streams.security.protocol=SASL_PLAINTEXT
+confluent.controlcenter.streams.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="c3" password="c3-secret";
+
+confluent.controlcenter.kafka.mycluster.bootstrap.servers={{ MY_IP }}:9091
+confluent.controlcenter.kafka.mycluster.sasl.mechanism=PLAIN
+confluent.controlcenter.kafka.mycluster.security.protocol=SASL_PLAINTEXT
+confluent.controlcenter.kafka.mycluster.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="c3" password="c3-secret";
+
+
+interceptor.classes=io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor,io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
+confluent.monitoring.interceptor.bootstrap.servers={{ MY_IP }}:9091
+confluent.monitoring.interceptor.sasl.mechanism=PLAIN
+confluent.monitoring.interceptor.security.protocol=SASL_PLAINTEXT
+confluent.monitoring.interceptor.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="c3" password="c3-secret";
 
 # Replication for internal Control Center topics.
 confluent.controlcenter.internal.topics.replication={{ REPLICATION_FACTOR }}
@@ -35,6 +54,9 @@ confluent.telemetry.api.secret=<HEALTHPLUS-SECRET>
 confluent.metrics.reporter.topic.replicas={{ REPLICATION_FACTOR }}
 metric.reporters=io.confluent.metrics.reporter.ConfluentMetricsReporter
 confluent.metrics.reporter.bootstrap.servers={{ MY_IP }}:9001
+confluent.metrics.reporter.sasl.mechanism=PLAIN
+confluent.metrics.reporter.security.protocol=SASL_PLAINTEXT
+confluent.metrics.reporter.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="metrics" password="metrics-secret";
 {% endif -%}
 
 confluent.monitoring.interceptor.topic.replication={{ REPLICATION_FACTOR }}
