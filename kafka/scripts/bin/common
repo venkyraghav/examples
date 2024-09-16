@@ -30,7 +30,7 @@ RunJ2() {
     if [[ -f $2 ]]; then
         MyEcho "WARN" "$2 exist. Overwriting ..."
     fi
-    j2 $1 > $2
+    jinja2 $1 > $2
 }
 
 Precheck() {
@@ -77,8 +77,8 @@ Precheck() {
         MyEcho "ERROR" "wget is not installed"
         exit 1
     fi
-    if [[ ! -x $(which j2) ]] ; then
-        MyEcho "ERROR" "j2 is not installed"
+    if [[ ! -x $(which jinja2) ]] ; then
+        MyEcho "ERROR" "jinja2 is not installed"
         exit 1
     fi
 

@@ -1,0 +1,11 @@
+---
+services:
+  trogdor-controller:
+    image: confluentinc/cp-kafka:latest
+    hostname: trogdor-controller
+    container_name: trogdor-controller
+    command: >
+      bash -c "cat << EOF python manage.py migrate
+      && python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - 8889:8889

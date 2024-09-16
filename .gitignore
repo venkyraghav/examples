@@ -43,3 +43,5 @@ hs_err_pid*
 **/.vscode/*
 **/c-clients/*
 **/MODULE.bazel.lock
+**/bin/*
+**/obj/*

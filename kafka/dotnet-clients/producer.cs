@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Confluent.SchemaRegistry.Serdes;
 using System.Text;
-using System.Net.Http;
+using System.Net.Http;sd
 using System.CommandLine;
 
 namespace Confluent.Kafka.Examples
@@ -17,13 +17,13 @@ namespace Confluent.Kafka.Examples
     {
         [JsonProperty(PropertyName = "favoriteColor")]
         public String favorite_color;
-        
+
         [JsonProperty(PropertyName = "favoriteNumber")]
         public int favorite_number;
-        
+
         [JsonProperty(PropertyName = "hourlyRate")]
         public Decimal hourly_rate;
-        
+
         [JsonProperty(PropertyName = "name")]
         public String name;
     }
@@ -298,7 +298,7 @@ namespace Confluent.Kafka.Examples
         //         config.BasicAuthCredentialsSource = AuthCredentialsSource.UserInfo;
         //         config.BasicAuthUserInfo = clientConfig["sasl.username"] + ":" + clientConfig["sasl.password"];
         //     }
-            
+
         //     config.Url = clientConfig["schema.registry.url"];
         //     if (clientConfig.ContainsKey ("ssl.ca.location")) {
         //         config.SslCaLocation = clientConfig["ssl.ca.location"];
@@ -307,7 +307,7 @@ namespace Confluent.Kafka.Examples
         //     // curl --cacert /Users/vnarayanan/_official/vagrant/data/kafka-truststore.crt -X GET -u venky-client2:Kafka4Ever https://sr01.venky.net.compute.internal:8081/subjects
         //     // FIXME Should be config.EnableSslCertificateVerification = true
         //     config.EnableSslCertificateVerification = false;
-            
+
         //     return Task.FromResult(new CachedSchemaRegistryClient(config));
         // }
 
@@ -325,7 +325,7 @@ namespace Confluent.Kafka.Examples
               config.ClientRack =  clientConfig["client.rack"];
             }
 
-            if (clientConfig.ContainsKey ("sasl.mechanisms")) { 
+            if (clientConfig.ContainsKey ("sasl.mechanisms")) {
                 if (string.Equals(clientConfig["sasl.mechanisms"], "PLAIN")) {
                 config.SaslMechanism = SaslMechanism.Plain;
                 } else {
@@ -334,7 +334,7 @@ namespace Confluent.Kafka.Examples
                     return null;
                 }
             }
-            if (clientConfig.ContainsKey ("security.protocol")) { 
+            if (clientConfig.ContainsKey ("security.protocol")) {
                 if (string.Equals(clientConfig["security.protocol"], "SASL_SSL")) {
                     config.SecurityProtocol = SecurityProtocol.SaslSsl;
                     if (clientConfig.ContainsKey ("ssl.ca.location")) {
@@ -361,7 +361,7 @@ namespace Confluent.Kafka.Examples
         }
 
         static async Task<ClientConfig> CreateProducerConfig(Dictionary<string, string> clientConfig)
-        {   
+        {
             return await CreateCommonConfig(clientConfig);
         }
 
@@ -429,7 +429,7 @@ namespace Confluent.Kafka.Examples
             payload.Metrics.Add(GetNewRelicMetricsItem(metricsPrefix + "TxMsgs", stats.TxMsgs, "cumulativeCount", stats.Time));
             foreach (var broker in stats.Brokers)
             {
-                // 
+                //
                 metricsPrefix = prefix + "brokers." + broker.Value.NodeName + ".";
                 BrokerState brokerState = 0;
                 if (broker.Value.State.Equals("UP")) {
@@ -481,7 +481,7 @@ namespace Confluent.Kafka.Examples
                 PopulateNewRelicMetricsWindowStatistics(payload.Metrics, metricsPrefix + "throttle", broker.Value.Throttle, stats.Time);
                 PopulateNewRelicMetricsWindowStatistics(payload.Metrics, metricsPrefix + "outbuf_latency", broker.Value.OutbufLatency, stats.Time);
                 PopulateNewRelicMetricsWindowStatistics(payload.Metrics, metricsPrefix + "int_latency", broker.Value.IntLatency, stats.Time);
-                
+
                 PopulateNewRelicMetricsRequestStatistics(payload.Metrics, metricsPrefix + "req", broker.Value.Request, stats.Time);
             }
             foreach (var topic in stats.Topics)
@@ -499,7 +499,7 @@ namespace Confluent.Kafka.Examples
             }
             metricsPrefix = prefix + "cgrp.";
             PopulateNewRelicMetricsConsumerGroupStatistics(payload.Metrics, metricsPrefix, stats.Cgrp, stats.Time);
-            
+
             Console.WriteLine("Stats Modified = " + Newtonsoft.Json.JsonConvert.SerializeObject(payload, Formatting.None));
 
             using StringContent jsonContent = new("[" + Newtonsoft.Json.JsonConvert.SerializeObject(payload, Formatting.None) + "]", Encoding.UTF8, "application/json");
@@ -616,7 +616,7 @@ namespace Confluent.Kafka.Examples
                 mainList.Add(GetNewRelicMetricsItem(statsName + ".p99", item.P99, "gauge", timestamp));
                 mainList.Add(cnt);
             }
-            
+
         }
 
         private static NewRelicMetrics GetNewRelicMetricsItem(string name, dynamic value, string type, long timestamp)
@@ -681,7 +681,7 @@ namespace Confluent.Kafka.Examples
 
                 producer.Flush(TimeSpan.FromSeconds(10));
             }
-            
+
         }
 
         private static void produceDurable(IProducer<string, string> producer, string topic, string key, string val)
@@ -751,7 +751,7 @@ namespace Confluent.Kafka.Examples
                     producer.Poll(TimeSpan.FromSeconds(3));
                 }
                 else if (ex.Error.Code == ErrorCode.BrokerNotAvailable ||
-                    ex.Error.Code == ErrorCode.Local_AllBrokersDown 
+                    ex.Error.Code == ErrorCode.Local_AllBrokersDown
                     ||
                     ex.Error.Code == ErrorCode.LeaderNotAvailable ||
                     ex.Error.Code == ErrorCode.Local_Fail ||

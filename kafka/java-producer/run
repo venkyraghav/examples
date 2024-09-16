@@ -1,0 +1,20 @@
+#!/bin/bash
+gradle build
+
+code=$?
+if [[ ${code} -ne 0 ]]; then
+  echo "Exited with code ${code}"
+  exit ${code}
+fi
+
+export MY_LOCAL_IP=$( ifconfig en0 | grep "inet "|awk '{print $2}' )
+export JMX_PORT=28081
+
+export JAVA_MEM_OPTS="-Xms40M -Xmx512M -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:+ExplicitGCInvokesConcurrent -XX:MaxInlineLevel=15"
+export JAVA_JMX_OPTS="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=${JMX_PORT} -Dcom.sun.management.jmxremote.host=${MY_LOCAL_IP} -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.port=${JMX_PORT} -Djava.rmi.server.hostname=${MY_LOCAL_IP} -Djava.net.preferIPv4Stack=true"
+export JAVA_LOG4J_OPTS="-Dkafka.logs.dir=/Users/venky/Desktop -Dlog4j.configuration=file:///Users/venky/_official/cp/config/client-log4j.properties"
+export JAVA_JMX_AGENT_OPTS="-javaagent:/Users/venky/github.com/venkyraghav/examples/kafka/scripts/bin/../jar/jolokia-jvm-1.6.2-agent.jar=config=/Users/venky/Desktop/clientconfig/getting_started_jolokia.properties -javaagent:/Users/venky/github.com/venkyraghav/examples/kafka/scripts/bin/../jar/jmx_prometheus_javaagent-0.16.1.jar=${JMX_PORT}:/Users/venky/github.com/venkyraghav/examples/kafka/scripts/prop/kafka_client.yml"
+export JAVA_MISC_OPTS="-Djava.awt.headless=true"
+
+# echo "java ${JAVA_MEM_OPTS} ${JAVA_JMX_OPTS} ${JAVA_JMX_AGENT_OPTS} ${JAVA_MISC_OPTS} ${JAVA_LOG4J_OPTS} -jar build/libs/java-producer-0.0.1.jar" "$@"
+java ${JAVA_MEM_OPTS} ${JAVA_JMX_OPTS} ${JAVA_JMX_AGENT_OPTS} ${JAVA_MISC_OPTS} ${JAVA_LOG4J_OPTS} -jar build/libs/java-producer-0.0.1.jar "$@"
