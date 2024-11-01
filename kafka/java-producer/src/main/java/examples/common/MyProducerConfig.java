@@ -14,6 +14,28 @@ public class MyProducerConfig {
     private long payloadCount;
     private boolean transactional;
     private String bootstrapServer;
+    private Format keyFormat;
+    private Format valueFormat;
+
+    public MyProducerConfig() {
+        keyFormat = Format.STRING;
+        valueFormat = Format.STRING;
+    }
+    public Format getValueFormat() {
+        return valueFormat;
+    }
+
+    public void setValueFormat(Format valueFormat) {
+        this.valueFormat = valueFormat;
+    }
+
+    public Format getKeyFormat() {
+        return keyFormat;
+    }
+
+    public void setKeyFormat(Format keyFormat) {
+        this.keyFormat = keyFormat;
+    }
 
     public boolean isDoConsume() {
         return doConsume;

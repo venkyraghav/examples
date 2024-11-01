@@ -1,6 +1,5 @@
-package examples.common.clients;
+package examples.clients;
 
-import examples.common.MyProducerConfig;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -11,7 +10,8 @@ import org.apache.kafka.common.errors.ProducerFencedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
+import examples.common.MyProducerConfig;
+
 import java.time.Duration;
 import java.util.*;
 

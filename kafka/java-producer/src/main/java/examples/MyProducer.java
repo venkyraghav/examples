@@ -1,10 +1,11 @@
 package examples;
 
+import examples.clients.ProducerBase;
+import examples.clients.SimpleProducer;
+import examples.clients.TransactionalProducer;
 import examples.common.MyProducerArgs;
 import examples.common.MyProducerConfig;
-import examples.common.clients.ProducerBase;
-import examples.common.clients.SimpleProducer;
-import examples.common.clients.TransactionalProducer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

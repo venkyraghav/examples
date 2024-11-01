@@ -56,6 +56,8 @@ public class MyProducerArgs {
             config.setPayloadCount (getLongArgument(cmd, ProgArg.PAYLOAD_COUNT));
             config.setPayloadSize (getLongArgument(cmd, ProgArg.PAYLOAD_SIZE));
             config.setCommandConfig (getArgument(cmd, ProgArg.COMMAND_CONFIG));
+            config.setKeyFormat (Format.lookup(getArgument(cmd, ProgArg.KEY_FORMAT)));
+            config.setValueFormat (Format.lookup(getArgument(cmd, ProgArg.VALUE_FORMAT)));
 
             validateArgs(config);
 
@@ -94,7 +96,12 @@ public class MyProducerArgs {
             } catch (Exception e) {
                 throw new ArgException(e.getMessage());
             }
-
+        }
+        if (config.getKeyFormat().isSupported() == false) {
+            throw new ArgException(ProgArg.KEY_FORMAT.getDescription());
+        }
+        if (config.getValueFormat().isSupported() == false) {
+            throw new ArgException(ProgArg.VALUE_FORMAT.getDescription());
         }
     }
     

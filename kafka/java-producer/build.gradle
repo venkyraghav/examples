@@ -32,8 +32,14 @@ dependencies {
     implementation group: 'org.slf4j', name: 'slf4j-log4j12', version: '2.0.13'
     implementation group: 'net.jpountz.lz4', name: 'lz4', version: '1.3.0'
     implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.4.0'
+    implementation group: 'org.apache.avro', name: 'avro', version: '1.12.0'
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.15.2'
     implementation group: 'commons-cli', name: 'commons-cli', version: '1.8.0'
+    implementation group: 'io.confluent', name: 'kafka-avro-serializer', version: '7.7.1'
+    implementation group: 'io.confluent', name: 'kafka-protobuf-serializer', version: '7.7.1'
+    implementation group: 'io.confluent', name: 'kafka-json-schema-serializer', version: '7.7.1'
+    implementation group: 'io.confluent', name: 'kafka-json-serializer', version: '7.7.1'
+    implementation group: 'io.confluent', name: 'kafka-schema-serializer', version: '7.7.1'
 }
 
 jar {
@@ -46,6 +52,6 @@ jar {
 }
 
 shadowJar {
-    archiveBaseName = "kafka-java-getting-started"
+    archiveBaseName = "java-producer-fat"
     archiveClassifier = ''
 }

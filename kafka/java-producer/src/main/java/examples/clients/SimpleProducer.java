@@ -1,6 +1,5 @@
-package examples.common.clients;
+package examples.clients;
 
-import examples.common.MyProducerConfig;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -9,13 +8,15 @@ import org.apache.kafka.common.errors.RetriableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import examples.common.MyProducerConfig;
+
 import java.util.Properties;
 import java.util.function.BiConsumer;
 
 public class SimpleProducer extends ProducerBase {
     private static final Logger log = LoggerFactory.getLogger(SimpleProducer.class);
 
-    private BiConsumer<ProducerRecord<String,String>, RecordMetadata> consumerProducer;
+    private BiConsumer<ProducerRecord<Object, Object>, RecordMetadata> consumerProducer;
     private BiConsumer<RecordMetadata, Exception> consumerException;
 
     public SimpleProducer(MyProducerConfig config) {
@@ -34,23 +35,23 @@ public class SimpleProducer extends ProducerBase {
         }
     }
 
-    private void produce(ProducerRecord<String,String> record, RecordMetadata metadata) {
+    private void produce(ProducerRecord<Object, Object> record, RecordMetadata metadata) {
         if (log.isInfoEnabled()) {log.info("produced {}", record);}
     }
 
-    private void setProducerCallback(BiConsumer<ProducerRecord<String,String>, RecordMetadata> consumerProducer, BiConsumer<RecordMetadata, Exception> consumerException) {
+    private void setProducerCallback(BiConsumer<ProducerRecord<Object, Object>, RecordMetadata> consumerProducer, BiConsumer<RecordMetadata, Exception> consumerException) {
         this.consumerProducer = consumerProducer;
         this.consumerException = consumerException;
     }
 
     protected void doProcess(Properties props) {
-        try (final Producer<String, String> producer = new KafkaProducer<>(props)) {
+        try (final Producer<Object, Object> producer = new KafkaProducer<>(props)) {
             final long numMessages = 5L;
             for (long outer = 0; outer < config.getPayloadCount(); outer++) {
                 for (long i = 0; i < numMessages; i++) {
-                    String key = generateRandonString(10);
-                    String value = generateRandonString(config.getPayloadSize());
-                    ProducerRecord<String,String> record = new ProducerRecord<>(config.getTopic(), key, value);
+                    ProducerRecord<Object, Object> record = new ProducerRecord<>(config.getTopic(), 
+                            getKey(config.getKeyFormat(), 10), 
+                            getValue(config.getValueFormat(), config.getPayloadSize()));
                     producer.send(
                             record,
                             (metadata, ex) -> {
