@@ -1,0 +1,6 @@
+syntax = "proto3";
+package examples;
+
+message myrecordproto {
+   string f1 = 1;
+}

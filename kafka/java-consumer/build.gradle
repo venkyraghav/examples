@@ -41,12 +41,12 @@ jar {
     manifest {
         attributes(
                 "Class-Path": configurations.compileClasspath.collect { it.absolutePath }.join(" "),
-                "Main-Class": "examples.MyConsumer"
+                "Main-Class": "examples.ConsumerExample"
         )
     }
 }
 
 shadowJar {
-    archiveBaseName = "kafka-java-getting-started"
+    archiveBaseName = "java-consumer-fat"
     archiveClassifier = ''
 }

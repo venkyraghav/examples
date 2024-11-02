@@ -1,0 +1,80 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath "gradle.plugin.com.github.jengelman.gradle.plugins:shadow:7.0.0"
+    }
+}
+
+plugins {
+    id "java"
+    id "idea"
+    id "eclipse"
+    id 'com.google.protobuf' version '0.8.18'
+}
+
+sourceCompatibility = "1.17"
+targetCompatibility = "1.17"
+version = "0.0.1"
+
+repositories {
+    mavenCentral()
+
+    maven {
+        url "https://packages.confluent.io/maven"
+    }
+}
+
+protobuf {
+    protoc {
+        artifact = 'com.google.protobuf:protoc:3.23.0'
+    }
+    generateProtoTasks {
+        all().each { task ->
+            task.builtins {
+                java {
+                    option 'lite'
+                }
+            }
+        }
+    }
+}
+
+apply plugin: "com.github.johnrengelman.shadow"
+
+dependencies {
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: '2.0.13'
+    implementation group: 'org.slf4j', name: 'slf4j-log4j12', version: '2.0.13'
+    implementation group: 'org.lz4', name: 'lz4-java', version: '1.8.0'
+
+    implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.4.0'
+    implementation group: 'org.apache.avro', name: 'avro', version: '1.12.0'
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.15.2'
+    implementation group: 'io.confluent', name: 'kafka-avro-serializer', version: '7.7.1'
+    implementation group: 'io.confluent', name: 'kafka-protobuf-serializer', version: '7.7.1'
+    implementation group: 'io.confluent', name: 'kafka-json-schema-serializer', version: '7.7.1'
+    implementation group: 'io.confluent', name: 'kafka-json-serializer', version: '7.7.1'
+    implementation group: 'io.confluent', name: 'kafka-schema-serializer', version: '7.7.1'
+    implementation group: 'info.picocli', name: 'picocli', version: '4.7.6'
+    annotationProcessor 'info.picocli:picocli-codegen:4.7.6'
+
+    implementation 'com.google.protobuf:protobuf-java:3.23.0'
+    implementation 'io.grpc:grpc-netty-shaded:1.57.2'
+    implementation 'io.grpc:grpc-protobuf:1.57.2'
+    implementation 'io.grpc:grpc-stub:1.57.2'
+}
+
+jar {
+    manifest {
+        attributes(
+            "Class-Path": configurations.compileClasspath.collect { it.absolutePath }.join(" "),
+            "Main-Class": "examples.KafkaClient"
+        )
+    }
+}
+
+shadowJar {
+    archiveBaseName = "kclient-fat"
+    archiveClassifier = ''
+}
