@@ -1,0 +1,27 @@
+{
+  "CN": "*.my.domain",
+  "hosts": [
+    "confluent-manager-for-apache-flink.confluent.svc.cluster.local",
+    "keycloak.confluent.svc.cluster.local",
+    "*.my.domain",
+    "*.confluent.svc.cluster.local",
+    "*.zookeeper.confluent.svc.cluster.local",
+    "*.kraftcontroller.confluent.svc.cluster.local",
+    "*.kafka.confluent.svc.cluster.local",
+    "*.ldap.confluent.svc.cluster.local",
+    "ldap.confluent.svc.cluster.local",
+    "*.destination.svc.cluster.local",
+    "*.source.svc.cluster.local"
+  ],
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "Universe",
+      "ST": "Pangea",
+      "L": "Earth"
+    }
+  ]
+}
