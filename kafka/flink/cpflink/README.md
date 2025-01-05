@@ -46,7 +46,6 @@ openssl pkcs12 -export -in server.pem -inkey server-key.pem -out jks/server.p12 
 keytool -importkeystore -srckeystore jks/server.p12 -srcstoretype pkcs12 -destkeystore jks/keystore.jks
 
 keytool -import -v -trustcacerts -keystore jks/truststore.jks -storetype JKS -storepass changeme -alias CA -file server.pem # TODO This is not CA. 
-
 ```
 
 ### Install operators
@@ -69,7 +68,8 @@ kubectl create ns confluent
 * Add License
 
 ```shell
-kubectl create secret generic cp-license --from-file=license.txt -n confluent
+kubectl create secret generic cp-license --from-file=license.txt=license.txt= -n confluent
+kubectl create secret generic cp-license-2 --from-file=license.txt=license.txt -n confluent
 ```
 
 * Add certs
@@ -91,12 +91,96 @@ helm upgrade --install cp-flink-kubernetes-operator confluentinc/flink-kubernete
 helm pull confluentinc/flink-kubernetes-operator 
 
 helm upgrade --install confluent-operator confluentinc/confluent-for-kubernetes --set enableCMFDay2Ops=true -n confluent
-
 ```
+
+* Add to `/etc/hosts`
+
+```properties
+127.0.0.1 confluent-manager-for-apache-flink confluent-manager-for-apache-flink.confluent.svc.cluster.local
+127.0.0.1 flink-app1-rest flink-app1-rest.confluent.svc.cluster.local
+127.0.0.1 flink-operator-webhook-service flink-operator-webhook-service.confluent.svc.cluster.local
+127.0.0.1 keycloak keycloak.confluent.svc.cluster.local
+```
+
+* Install keycloak
+
+```shell
+cd ~/github.com/confluentinc/confluent-kubernetes-examples/security/oauth/keycloak
+
+kubectl apply -f keycloak_deploy.yaml -n confluent
+
+kubectl port-forward service/keycloak 8080:8080 -n confluent
+
+# Check token with `jwt.io`
+curl --location 'http://keycloak:8080/realms/sso_test/protocol/openid-connect/token' --header 'Content-Type: application/x-www-form-urlencoded' --header 'Authorization: Basic c3NvbG9naW46S2JMUmloMUh6akRDMjY3UGVmdUtVN1FJb1o4aGdIREs=' --data-urlencode 'grant_type=client_credentials'
+```
+
+* Create new SSO users using keycload admin UI `http://keycloak:8080/`
+  * UserID: admin
+  * Password: admin
+  * realm: sso_test
+  * Users: `flink_client_1`, `flink_client_2`, `flink_client_3`
 
 ### Install CP Kafka
 
-TODO
+```shell
+kubectl create -n confluent secret generic oauth-jass --from-file=oauth.txt=oauth_jass.txt
+
+kubectl create secret generic mds-token --from-file=mdsPublicKey.pem=mds-publickey.txt --from-file=mdsTokenKeyPair.pem=mds-tokenkeypair.txt -n confluent
+
+kubectl create secret generic credential --from-file=plain-users.json=creds-kafka-sasl-users.json --from-file=plain.txt=creds-client-kafka-sasl-user.txt --from-file=ldap.txt=ldap.txt -n confluent
+
+kubectl apply -f cp_components.yaml -n confluent
+```
+
+#### Validation
+
+```shell
+
+kubectl get pod -n confluent
+kubectl exec -it pod/kafka-0 -n confluent -- /bin/bash
+```
+
+```properties
+cat <<EOF>/tmp/kafka1.properties
+# kafka1.properties
+sasl.mechanism=OAUTHBEARER
+security.protocol=SASL_SSL
+sasl.login.callback.handler.class=org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerLoginCallbackHandler
+sasl.login.connect.timeout.ms=15000
+sasl.oauthbearer.token.endpoint.url=http://keycloak:8080/realms/sso_test/protocol/openid-connect/token
+sasl.jaas.config=org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required clientId="ssologin" clientSecret="KbLRih1HzjDC267PefuKU7QIoZ8hgHDK";
+ssl.truststore.location=/mnt/sslcerts/kafka-tls/truststore.p12
+ssl.truststore.password=mystorepassword
+EOF
+
+cat <<EOF>/tmp/kafka2.properties
+# kafka2.properties
+sasl.mechanism=OAUTHBEARER
+security.protocol=SASL_SSL
+sasl.login.callback.handler.class=org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerLoginCallbackHandler
+sasl.login.connect.timeout.ms=15000
+sasl.oauthbearer.token.endpoint.url=http://keycloak:8080/realms/sso_test/protocol/openid-connect/token
+sasl.jaas.config=org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required clientId="flink_client_1" clientSecret="o2lE80cOb6XHETa5ozyoWHt4MG7fiLaR";
+ssl.truststore.location=/mnt/sslcerts/kafka-tls/truststore.p12
+ssl.truststore.password=mystorepassword
+EOF
+```
+
+```shell
+kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9073 --list --command-config /tmp/kafka2.properties
+
+kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9073 --topic test-topic-internal-new --create --replication-factor 3 --command-config /tmp/kafka2.properties
+
+kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9073 --topic test-topic-internal --create --replication-factor 3 --command-config /tmp/kafka1.properties
+kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9094 --list --command-config /tmp/kafka1.properties
+
+kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9092 --topic test-topic-external --create --replication-factor 3 --command-config /tmp/kafka1.properties
+kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9072 --topic test-topic-replication --create --replication-factor 3 --command-config /tmp/kafka1.properties
+kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9094 --topic test-topic-custom --create --replication-factor 3 --command-config /tmp/kafka1.properties
+
+kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9094 --list --command-config /tmp/kafka1.properties
+```
 
 ### Install CP Flink
 
@@ -147,7 +231,6 @@ kubectl apply -f flinkapplication.yaml
 kubectl get flinkapplication
 
 kubectl port-forward svc/flink-app1-rest 8081:8081 -n confluent
-
 ```
 
 * Deploy Flink Jobs using `confluent` commands
@@ -160,13 +243,12 @@ confluent flink environment create env1 --url http://localhost:8080 --kubernetes
 confluent flink application create flink_job.json --environment env1 --url http://localhost:8080
 
 confluent flink application web-ui-forward basic-example --environment env1 --port 8090 --url http://localhost:8080
-
-
 ```
 
 ### Setup monitoring
 
 TODO
 
-### With AuthZ
+### CP Flink With AuthZ
 
+TODO

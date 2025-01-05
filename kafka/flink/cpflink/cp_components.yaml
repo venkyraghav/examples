@@ -1,0 +1,184 @@
+apiVersion: platform.confluent.io/v1beta1
+kind: KRaftController
+metadata:
+  name: kraftcontroller
+  namespace: confluent
+spec:
+  license:
+    secretRef: cp-license-2
+  dataVolumeCapacity: 10G
+  image:
+    application: confluentinc/cp-server:7.8.0
+    init: confluentinc/confluent-init-container:2.10.0
+  listeners:
+    controller:
+      tls:
+        enabled: true
+        secretRef: kafka-tls
+      authentication:
+        type: oauth
+        jaasConfig:
+          secretRef: oauth-jass
+        oauthSettings:
+          tokenEndpointUri: http://keycloak:8080/realms/sso_test/protocol/openid-connect/token
+          expectedIssuer: http://keycloak:8080/realms/sso_test
+          jwksEndpointUri: http://keycloak:8080/realms/sso_test/protocol/openid-connect/certs
+          subClaimName: client_id
+  authorization:
+    type: rbac
+    superUsers:
+      - User:operator # required: default user corresponding to replication listener in kafka, ow will get topic authorization error
+      - User:kafka
+      - User:ssologin
+  dependencies:
+    mdsKafkaCluster:
+      bootstrapEndpoint: kafka.confluent.svc.cluster.local:9073
+      authentication:
+        type: oauth
+        jaasConfig:
+          secretRef: oauth-jass
+        oauthSettings:
+          tokenEndpointUri: http://keycloak:8080/realms/sso_test/protocol/openid-connect/token
+      tls:
+        enabled: true
+        secretRef: kafka-tls
+  tls:
+    secretRef: kafka-tls
+  replicas: 3
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: Kafka
+metadata:
+  name: kafka
+  namespace: confluent
+spec:
+  license:
+    secretRef: cp-license-2
+  replicas: 3
+  image:
+    application: confluentinc/cp-server:7.8.0
+    init: confluentinc/confluent-init-container:2.10.0
+  dataVolumeCapacity: 20Gi
+  tls:
+    secretRef: kafka-tls
+  listeners:
+    external:
+      authentication:
+        type: oauth
+        oauthSettings:
+          tokenEndpointUri: http://keycloak:8080/realms/sso_test/protocol/openid-connect/token
+          expectedIssuer: http://keycloak:8080/realms/sso_test
+          jwksEndpointUri: http://keycloak:8080/realms/sso_test/protocol/openid-connect/certs
+          subClaimName: client_id
+      tls:
+        secretRef: kafka-tls
+        enabled: true
+    internal:
+      authentication:
+        type: plain
+        jaasConfig:
+          secretRef: credential
+      tls:
+        enabled: true
+        secretRef: kafka-tls
+    replication:
+      authentication:
+        type: oauth
+        jaasConfig:
+          secretRef: oauth-jass
+        oauthSettings:
+          tokenEndpointUri: http://keycloak:8080/realms/sso_test/protocol/openid-connect/token
+          expectedIssuer: http://keycloak:8080/realms/sso_test
+          jwksEndpointUri: http://keycloak:8080/realms/sso_test/protocol/openid-connect/certs
+          subClaimName: client_id
+      tls:
+        secretRef: kafka-tls
+        enabled: true
+    custom:
+      - name: customoauth
+        port: 9094
+        authentication:
+          type: oauth
+          oauthSettings:
+            tokenEndpointUri: http://keycloak:8080/realms/sso_test/protocol/openid-connect/token
+            expectedIssuer: http://keycloak:8080/realms/sso_test
+            jwksEndpointUri: http://keycloak:8080/realms/sso_test/protocol/openid-connect/certs
+            subClaimName: client_id
+        tls:
+          secretRef: kafka-tls
+          enabled: true
+  authorization:
+    type: rbac
+    superUsers:
+      - User:operator # required: default user corresponding to replication listener in kafka, ow will get topic authorization error
+      - User:ssologin
+      - User:kafka
+  services:
+    mds:
+      tls:
+        enabled: true
+        secretRef: kafka-tls
+      tokenKeyPair:
+        secretRef: mds-token
+      provider:
+        oauth:
+          configurations:
+            expectedIssuer: http://keycloak:8080/realms/sso_test
+            jwksEndpointUri: http://keycloak:8080/realms/sso_test/protocol/openid-connect/certs
+            subClaimName: client_id
+  dependencies:
+    kRaftController:
+      controllerListener:
+        tls:
+          enabled: true
+          secretRef: kafka-tls
+        authentication:
+          type: oauth
+          jaasConfig:
+            secretRef: oauth-jass
+          oauthSettings:
+            tokenEndpointUri: http://keycloak:8080/realms/sso_test/protocol/openid-connect/token
+      clusterRef:
+        name: kraftcontroller
+    kafkaRest:
+      authentication:
+        type: oauth
+        jaasConfig:
+          secretRef: oauth-jass
+        oauthSettings:
+          tokenEndpointUri: http://keycloak:8080/realms/sso_test/protocol/openid-connect/token
+          expectedIssuer: http://keycloak:8080/realms/sso_test
+          jwksEndpointUri: http://keycloak:8080/realms/sso_test/protocol/openid-connect/certs
+          subClaimName: client_id
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: KafkaRestClass
+metadata:
+  name: default
+  namespace: confluent
+spec:
+  kafkaRest:
+    authentication:
+      type: oauth
+      oauth:
+        secretRef: oauth-jass
+        configuration:
+          tokenEndpointUri: http://keycloak:8080/realms/sso_test/protocol/openid-connect/token
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: ConfluentRolebinding
+metadata:
+  name: venky-client-1-topic-test
+  namespace: confluent
+spec:
+  clustersScopeByIds:
+    kafkaClusterId: 9532bfd0-946e-4235-bd4
+  principal:
+    name: flink_client_1
+    type: user
+  role: ResourceOwner
+  resourcePatterns:
+  - name: test
+    patternType: PREFIXED
+    resourceType: Topic
+---
