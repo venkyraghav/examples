@@ -182,15 +182,12 @@ kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9094 --topic t
 kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9094 --list --command-config /tmp/kafka1.properties
 ```
 
-### Install CP Flink
+### Install CP Flink with security
 
 ```shell
-helm upgrade --install -f local.yaml cmf confluentinc/confluent-manager-for-apache-flink --namespace confluent --set license.secretRef=cp-license
+helm upgrade --install -f flink_security.yaml cmf confluentinc/confluent-manager-for-apache-flink --namespace confluent --set license.secretRef=cp-license
 
 helm inspect values --version 1.0.1 confluentinc/confluent-manager-for-apache-flink
-
-# Add uncommented entry to /etc/hosts
-# 127.0.0.1       confluent-manager-for-apache-flink.confluent.svc.cluster.local
 
 curl --cert ./generated/server.pem --key ./generated/server-key.pem --cacert generated/ca.pem  https://confluent-manager-for-apache-flink.confluent.svc.cluster.local:8080/cmf/api/v1/environments
 
@@ -246,9 +243,5 @@ confluent flink application web-ui-forward basic-example --environment env1 --po
 ```
 
 ### Setup monitoring
-
-TODO
-
-### CP Flink With AuthZ
 
 TODO
