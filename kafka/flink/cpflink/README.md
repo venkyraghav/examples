@@ -197,7 +197,7 @@ kubectl apply -f CMFRestClass.yaml -n confluent
 kubectl describe CMFRestClass/default -n confluent
 ```
 
-### Run Jobs
+### Run Jobs (TODO to revise based on AuthZ setup)
 
 * Deploy Flink Jobs using `kubectl` commands
 
