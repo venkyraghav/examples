@@ -1,0 +1,174 @@
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: ConfluentRolebinding
+metadata:
+  name: ssologin-sysadmin
+  namespace: confluent
+spec:
+  clustersScopeByIds:
+    kafkaClusterId: 9532bfd0-946e-4235-bd4
+  principal:
+    name: ssologin
+    type: user
+  role: SystemAdmin
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: ConfluentRolebinding
+metadata:
+  name: venky-client-1-topic-test
+  namespace: confluent
+spec:
+  clustersScopeByIds:
+    kafkaClusterId: 9532bfd0-946e-4235-bd4
+  principal:
+    name: venky_client_1
+    type: user
+  role: ResourceOwner
+  resourcePatterns:
+  - name: test
+    patternType: PREFIXED
+    resourceType: Topic
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: ConfluentRolebinding
+metadata:
+  name: flink-client-1-crb-topics
+  namespace: confluent
+spec:
+  clustersScopeByIds:
+    kafkaClusterId: 9532bfd0-946e-4235-bd4
+  principal:
+    name: flink_client_1
+    type: user
+  role: ResourceOwner
+  resourcePatterns:
+  - name: test
+    patternType: PREFIXED
+    resourceType: Topic
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: ConfluentRolebinding
+metadata:
+  name: ssologin-crb-cmf
+  namespace: confluent
+spec:
+  clustersScopeByIds:
+    cmfId: CMF-id
+  principal:
+    name: ssologin
+    type: user
+  role: SystemAdmin
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: ConfluentRolebinding
+metadata:
+  name: sslcn-crb-cmf
+  namespace: confluent
+spec:
+  clustersScopeByIds:
+    cmfId: CMF-id
+  principal:
+    name: "CN=*.my.domain,L=Earth,ST=Pangea,C=Universe"
+    type: user
+  role: SystemAdmin
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: ConfluentRolebinding
+metadata:
+  name: flink-sysadmin-crb-cmf
+  namespace: confluent
+spec:
+  clustersScopeByIds:
+    cmfId: CMF-id
+    flinkEnvironmentId: flink-env1
+  principal:
+    name: flink_sysadmin
+    type: user
+  role: SystemAdmin
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: ConfluentRolebinding
+metadata:
+  name: flink-client-1-crb-cmf-flinkmanage
+  namespace: confluent
+spec:
+  clustersScopeByIds:
+    cmfId: CMF-id
+    flinkEnvironmentId: flink-env1
+  principal:
+    name: flink_client_1
+    type: user
+  role: DeveloperManage
+  resourcePatterns:
+  - name: flink
+    patternType: PREFIXED
+    resourceType: FlinkApplication
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: ConfluentRolebinding
+metadata:
+  name: flink-client-1-crb-cmf-flinkread
+  namespace: confluent
+spec:
+  clustersScopeByIds:
+    cmfId: CMF-id
+    flinkEnvironmentId: flink-env1
+  principal:
+    name: flink_client_1
+    type: user
+  role: DeveloperRead
+  resourcePatterns:
+  - name: flink
+    patternType: PREFIXED
+    resourceType: FlinkApplication
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: ConfluentRolebinding
+metadata:
+  name: flink-sysadmin-crb-cmf-flinkmanage
+  namespace: confluent
+spec:
+  clustersScopeByIds:
+    cmfId: CMF-id
+    flinkEnvironmentId: flink-env1
+  principal:
+    name: flink_sysadmin
+    type: user
+  role: DeveloperManage
+  resourcePatterns:
+  - name: flink
+    patternType: PREFIXED
+    resourceType: FlinkApplication
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: ConfluentRolebinding
+metadata:
+  name: flink-sysadmin-1-crb-cmf-flinkread
+  namespace: confluent
+spec:
+  clustersScopeByIds:
+    cmfId: CMF-id
+    flinkEnvironmentId: flink-env1
+  principal:
+    name: flink_sysadmin
+    type: user
+  role: DeveloperRead
+  resourcePatterns:
+  - name: flink
+    patternType: PREFIXED
+    resourceType: FlinkApplication
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: ConfluentRolebinding
+metadata:
+  name: flink-sysadmin-crb-cmf-allresources
+  namespace: confluent
+spec:
+  clustersScopeByIds:
+    cmfId: CMF-id
+    flinkEnvironmentId: flink-env1
+  principal:
+    name: flink_sysadmin
+    type: user
+  role: ClusterAdmin
+---

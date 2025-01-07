@@ -15,11 +15,11 @@ spec:
   serviceAccount: flink
   jobManager:
     resource:
-      memory: "1.0G"
+      memory: 1048m
       cpu: 1
   taskManager:
     resource:
-      memory: "1.0G"
+      memory: 1048m
       cpu: 1
   job:
     jarURI: local:///opt/flink/examples/streaming/StateMachineExample.jar

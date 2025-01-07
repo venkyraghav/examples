@@ -22,12 +22,12 @@ gcloud container clusters create venky-cp-flink  --zone=us-east1-b --num-nodes=6
 
 * IMPORTANT: namespace should match the SAN name part. For ex: Resources deployed in `confluent` namespace can be addressed using DNS wildcard `*.confluent.svc.cluster.local`
 
-* Commands below
+* Commands below (Default password is set to `changeme` in the script)
 
 ```shell
 brew install cfssl
 
-mkdir -p ./generated && cfssl gencert -initca ./ca-csr.json | cfssljson -bare ./generated/ca -
+mkdir -p ./generated/jks && cfssl gencert -initca ./ca-csr.json | cfssljson -bare ./generated/ca -
 
 # Validate Certificate Authority
 openssl x509 -in ./generated/ca.pem -text -noout
@@ -42,12 +42,13 @@ cfssl gencert -ca=./generated/ca.pem \
 openssl x509 -in ./generated/server.pem -text -noout
 
 # openssl pkcs12 -export -in server.pem -inkey server-key.pem -out jks/server.p12 -name "Server"
-openssl pkcs12 -export -passout pass:changeme -in server.pem -inkey server-key.pem -out jks/server.p12 -name "Server"
+openssl pkcs12 -export -passout pass:changeme -in ./generated/server.pem -inkey ./generated/server-key.pem -out ./generated/jks/server.p12 -name "Server"
 
 # keytool -importkeystore -srckeystore jks/server.p12 -srcstoretype pkcs12 -destkeystore jks/keystore.jks
-keytool -importkeystore -srcstorepass changeme -deststorepass changeme -destkeypass changeme -srckeystore jks/server.p12 -srcstoretype pkcs12 -destkeystore jks/keystore.jks
+keytool -importkeystore -srcstorepass changeme -deststorepass changeme -destkeypass changeme -srckeystore ./generated/jks/server.p12 -srcstoretype pkcs12 -destkeystore ./generated/jks/keystore.jks
 
-keytool -import -v -trustcacerts -keystore jks/truststore.jks -storetype JKS -storepass changeme -alias CA -file server.pem # TODO This is not CA. 
+keytool -import -v -trustcacerts -keystore ./generated/jks/truststore.jks -storetype JKS -storepass changeme -alias CA -file ./generated/server.pem # TODO This is not CA.
+
 ```
 
 ### Install operators
@@ -70,8 +71,16 @@ kubectl create ns confluent
 * Add License
 
 ```shell
-kubectl create secret generic cp-license --from-file=license.txt=license.txt= -n confluent
-kubectl create secret generic cp-license-2 --from-file=license.txt=license.txt -n confluent
+#
+# create ./cp-license.txt with following content
+# license=<license-key>
+#
+kubectl create secret generic cp-license --from-file=license.txt=./cp-license.txt -n confluent
+#
+# create ./cp-flink-license.txt with following content
+# <license-key>
+#
+kubectl create secret generic cp-flink-license --from-file=license.txt=./cp-flink-license.txt -n confluent
 ```
 
 * Add certs
@@ -125,7 +134,7 @@ curl --location 'http://keycloak:8080/realms/sso_test/protocol/openid-connect/to
   * UserID: admin
   * Password: admin
   * realm: sso_test
-  * Users: `flink_client_1`, `flink_client_2`, `flink_client_3`
+  * Users: `flink_sysadmin`, `flink_client_1`, `flink_client_2`, `flink_client_3`
 
 ### Install CP Kafka
 
@@ -136,7 +145,11 @@ kubectl create secret generic mds-token --from-file=mdsPublicKey.pem=mds-publick
 
 kubectl create secret generic credential --from-file=plain-users.json=creds-kafka-sasl-users.json --from-file=plain.txt=creds-client-kafka-sasl-user.txt --from-file=ldap.txt=ldap.txt -n confluent
 
+# Check if license SecretRef is configured. Modify accordingly
 kubectl apply -f cp_components.yaml -n confluent
+
+kubectl apply -f cp_crb.yaml -n confluent
+
 ```
 
 #### Validation
@@ -191,21 +204,21 @@ kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9094 --list --
 ### Install CP Flink with security
 
 ```shell
-helm upgrade --install -f flink_security.yaml cmf confluentinc/confluent-manager-for-apache-flink --namespace confluent --set license.secretRef=cp-license
-
-helm inspect values --version 1.0.1 confluentinc/confluent-manager-for-apache-flink
-
-curl --cert ./generated/server.pem --key ./generated/server-key.pem --cacert generated/ca.pem  https://confluent-manager-for-apache-flink.confluent.svc.cluster.local:8080/cmf/api/v1/environments
-
 # Create CMFRestClass.yaml
 kubectl apply -f CMFRestClass.yaml -n confluent
 
 kubectl describe CMFRestClass/default -n confluent
+
+helm upgrade --install -f flink_security.yaml cmf confluentinc/confluent-manager-for-apache-flink --namespace confluent --set license.secretRef=cp-flink-license
+
+helm inspect values --version 1.0.1 confluentinc/confluent-manager-for-apache-flink
+
+curl --cert ./generated/server.pem --key ./generated/server-key.pem --cacert generated/ca.pem  https://confluent-manager-for-apache-flink.confluent.svc.cluster.local:8080/cmf/api/v1/environments
 ```
 
 ### Run Jobs
 
-* Make sure you have all the latest confluentrolebindings from `cp_components.yaml`
+* Make sure you have all the latest confluentrolebindings from `cp_crb.yaml`
 
 * Deploy Flink Jobs using `kubectl` commands
 
@@ -222,18 +235,18 @@ kubectl describe CMFRestClass/default -n confluent
 # Error {"type":"org.apache.flink.kubernetes.operator.exception.ReconciliationException","message":"org.apache.flink.configuration.IllegalConfigurationException: TaskManager memory configuration failed: Sum of configured Framework Heap Memory (128.000mb (134217728 bytes)), Framework Off-Heap Memory (128.000mb (134217728 bytes)), Task Off-Heap Memory (0 bytes), Managed Memory (100.800mb (105696462 bytes)) and Network Memory (64.000mb (67108864 bytes)) exceed configured Total Flink Memory (252.000mb (264241152 bytes)).","additionalMetadata":{},"throwableList":[{"type":"org.apache.flink.configuration.IllegalConfigurationException","message":"TaskManager memory configuration failed: Sum of configured Framework Heap Memory (128.000mb (134217728 bytes)), Framework Off-Heap Memory (128.000mb (134217728 bytes)), Task Off-Heap Memory (0 bytes), Managed Memory (100.800mb (105696462 bytes)) and Network Memory (64.000mb (67108864 bytes)) exceed configured Total Flink Memory (252.000mb (264241152 bytes)).","additionalMetadata":{}},{"type":"org.apache.flink.configuration.IllegalConfigurationException","message":"Sum of configured Framework Heap Memory (128.000mb (134217728 bytes)), Framework Off-Heap Memory (128.000mb (134217728 bytes)), Task Off-Heap Memory (0 bytes), Managed Memory (100.800mb (105696462 bytes)) and Network Memory (64.000mb (67108864 bytes)) exceed configured Total Flink Memory (252.000mb (264241152 bytes)).","additionalMetadata":{}}]}
 
 # create flinkenvironment.yaml
-kubectl apply -f flinkenvironment.yaml
+kubectl apply -f flinkenvironment.yaml -n confluent
 
 # Env should be in `CREATED` status with no ERROR messages
-kubectl get flinkenvironments
+kubectl get flinkenvironments -n confluent
 
 # create flinkapplication.yaml
-kubectl apply -f flinkapplication.yaml
+kubectl apply -f flinkapplication.yaml -n confluent
 
 # App should be in `CREATED` status with no ERROR messages
 # It may take a whole to get to this state
 # Monitor events and pod logs
-kubectl get flinkapplication
+kubectl get flinkapplication -n confluent
 
 kubectl port-forward svc/flink-app1-rest 8081:8081 -n confluent
 ```
