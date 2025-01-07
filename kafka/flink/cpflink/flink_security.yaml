@@ -7,6 +7,10 @@ cmf:
     client-auth: need
   authentication:
     type: mtls
+    config:
+      auth.ssl.principal.mapping.rules:
+        RULE:^CN=.*,L=Earth,ST=Pangea,C=Universe$/flink_sysadmin/,
+        DEFAULT
   authorization:
     mdsRestConfig:
       endpoint: https://kafka.confluent.svc.cluster.local:8090

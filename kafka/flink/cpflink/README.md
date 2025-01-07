@@ -41,9 +41,11 @@ cfssl gencert -ca=./generated/ca.pem \
 # Validate server certificate and SANs
 openssl x509 -in ./generated/server.pem -text -noout
 
-openssl pkcs12 -export -in server.pem -inkey server-key.pem -out jks/server.p12 -name "Server"
+# openssl pkcs12 -export -in server.pem -inkey server-key.pem -out jks/server.p12 -name "Server"
+openssl pkcs12 -export -passout pass:changeme -in server.pem -inkey server-key.pem -out jks/server.p12 -name "Server"
 
-keytool -importkeystore -srckeystore jks/server.p12 -srcstoretype pkcs12 -destkeystore jks/keystore.jks
+# keytool -importkeystore -srckeystore jks/server.p12 -srcstoretype pkcs12 -destkeystore jks/keystore.jks
+keytool -importkeystore -srcstorepass changeme -deststorepass changeme -destkeypass changeme -srckeystore jks/server.p12 -srcstoretype pkcs12 -destkeystore jks/keystore.jks
 
 keytool -import -v -trustcacerts -keystore jks/truststore.jks -storetype JKS -storepass changeme -alias CA -file server.pem # TODO This is not CA. 
 ```
@@ -107,12 +109,16 @@ helm upgrade --install confluent-operator confluentinc/confluent-for-kubernetes 
 ```shell
 cd ~/github.com/confluentinc/confluent-kubernetes-examples/security/oauth/keycloak
 
+# replace `operator` namespace with `confluent`
 kubectl apply -f keycloak_deploy.yaml -n confluent
 
 kubectl port-forward service/keycloak 8080:8080 -n confluent
 
+# base64-endcoded create
+echo -n "<client_id>:<secret>" | base64
+
 # Check token with `jwt.io`
-curl --location 'http://keycloak:8080/realms/sso_test/protocol/openid-connect/token' --header 'Content-Type: application/x-www-form-urlencoded' --header 'Authorization: Basic c3NvbG9naW46S2JMUmloMUh6akRDMjY3UGVmdUtVN1FJb1o4aGdIREs=' --data-urlencode 'grant_type=client_credentials'
+curl --location 'http://keycloak:8080/realms/sso_test/protocol/openid-connect/token' --header 'Content-Type: application/x-www-form-urlencoded' --header 'Authorization: Basic <base64-endcoded>' --data-urlencode 'grant_type=client_credentials'
 ```
 
 * Create new SSO users using keycload admin UI `http://keycloak:8080/`
@@ -199,6 +205,8 @@ kubectl describe CMFRestClass/default -n confluent
 
 ### Run Jobs (TODO to revise based on AuthZ setup)
 
+confluent iam rbac role-binding create --principal User:flink_client_1 --role UserAdmin --cmf CMF-id
+
 * Deploy Flink Jobs using `kubectl` commands
 
 ```shell
@@ -230,7 +238,7 @@ kubectl get flinkapplication
 kubectl port-forward svc/flink-app1-rest 8081:8081 -n confluent
 ```
 
-* Deploy Flink Jobs using `confluent` commands
+* Deploy Flink Jobs using `confluent` commands (not recommended for cp-flink production)
 
 ```shell
 kubectl port-forward svc/cmf-service 8080:80 -n confluent

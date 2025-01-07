@@ -1,7 +1,7 @@
 apiVersion: platform.confluent.io/v1beta1
 kind: FlinkApplication
 metadata:
-  name: flink-app1
+  name: flink-app2
   namespace: confluent
 spec:
   flinkEnvironment: flink-env1
