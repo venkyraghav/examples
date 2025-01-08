@@ -22,9 +22,11 @@ gcloud container clusters create venky-cp-flink  --zone=us-east1-b --num-nodes=6
 
 * IMPORTANT: namespace should match the SAN name part. For ex: Resources deployed in `confluent` namespace can be addressed using DNS wildcard `*.confluent.svc.cluster.local`
 
-* Commands below (Default password is set to `changeme` in the script)
+* Commands below (Default password is set to `changeme` in the script).
 
 ```shell
+# IMPORTANT: make sure you are replacing all references to `changeme` passwords in all the config files (yaml, properties, etc ...)
+export PASSWORD=changeme
 brew install cfssl
 
 mkdir -p ./generated/jks && cfssl gencert -initca ./ca-csr.json | cfssljson -bare ./generated/ca -
@@ -42,12 +44,17 @@ cfssl gencert -ca=./generated/ca.pem \
 openssl x509 -in ./generated/server.pem -text -noout
 
 # openssl pkcs12 -export -in server.pem -inkey server-key.pem -out jks/server.p12 -name "Server"
-openssl pkcs12 -export -passout pass:changeme -in ./generated/server.pem -inkey ./generated/server-key.pem -out ./generated/jks/server.p12 -name "Server"
+openssl pkcs12 -export -passout pass:${PASSWORD} -in ./generated/server.pem -inkey ./generated/server-key.pem -out ./generated/jks/server.p12 -name "Server"
 
 # keytool -importkeystore -srckeystore jks/server.p12 -srcstoretype pkcs12 -destkeystore jks/keystore.jks
-keytool -importkeystore -srcstorepass changeme -deststorepass changeme -destkeypass changeme -srckeystore ./generated/jks/server.p12 -srcstoretype pkcs12 -destkeystore ./generated/jks/keystore.jks
+keytool -importkeystore -srcstorepass ${PASSWORD} -deststorepass ${PASSWORD} -destkeypass ${PASSWORD} -srckeystore ./generated/jks/server.p12 -srcstoretype pkcs12 -destkeystore ./generated/jks/keystore.jks
 
-keytool -import -v -trustcacerts -keystore ./generated/jks/truststore.jks -storetype JKS -storepass changeme -alias CA -file ./generated/server.pem # TODO This is not CA.
+keytool -import -v -trustcacerts -keystore ./generated/jks/truststore.jks -storetype JKS -storepass ${PASSWORD} -alias CA -file ./generated/server.pem # TODO This is not CA.
+
+# Watch for SAN Names
+keytool -v -list -keystore ./generated/jks/truststore.jks
+
+keytool -v -list -keystore ./generated/jks/keystorestore.jks
 
 ```
 
@@ -66,6 +73,9 @@ helm repo update
 
 ```shell
 kubectl create ns confluent
+
+# Sets `confluent` as the current namespace
+kubectl config set-context --current --namespace confluent
 ```
 
 * Add License
@@ -99,19 +109,32 @@ kubectl create -f https://github.com/jetstack/cert-manager/releases/download/v1.
 
 helm upgrade --install cp-flink-kubernetes-operator confluentinc/flink-kubernetes-operator -n confluent
 
-helm pull confluentinc/flink-kubernetes-operator 
+# Check for FKO pod RUNNING
+kubectl get pod -n confluent --watch
 
 helm upgrade --install confluent-operator confluentinc/confluent-for-kubernetes --set enableCMFDay2Ops=true -n confluent
+
+# Check for CFK pod RUNNING
+kubectl get pod -n confluent --watch
 ```
 
 * Add to `/etc/hosts`
 
 ```properties
-127.0.0.1 confluent-manager-for-apache-flink confluent-manager-for-apache-flink.confluent.svc.cluster.local
-127.0.0.1 flink-app1-rest flink-app1-rest.confluent.svc.cluster.local
-127.0.0.1 flink-operator-webhook-service flink-operator-webhook-service.confluent.svc.cluster.local
 127.0.0.1 keycloak keycloak.confluent.svc.cluster.local
+127.0.0.1 cmf-service cmf-service.confluent.svc.cluster.local confluent-manager-for-apache-flink confluent-manager-for-apache-flink.confluent.svc.cluster.local
+127.0.0.1 flink-app1-rest flink-app1-rest.confluent.svc.cluster.local
+# Not sure what this is for
+127.0.0.1 flink-operator-webhook-service flink-operator-webhook-service.confluent.svc.cluster.local
 ```
+
+* Port forwards run in background. While killing port-forward make sure to kill the parent process (while loop)
+
+|Port|Service|Command|
+|----|-------|-------|
+|8079|CMF|(while true; do kubectl port-forward svc/cmf-service 8079:80 -n confluent; done;) &|
+|8080|Keycloak|(while true; do kubectl port-forward svc/keycloak 8080:8080 -n confluent; done;) &|
+|8081|Flink App|(while true; do kubectl port-forward svc/flink-app1-rest 8081:8081 -n confluent; done;) &|
 
 * Install keycloak
 
@@ -121,7 +144,8 @@ cd ~/github.com/confluentinc/confluent-kubernetes-examples/security/oauth/keyclo
 # replace `operator` namespace with `confluent`
 kubectl apply -f keycloak_deploy.yaml -n confluent
 
-kubectl port-forward service/keycloak 8080:8080 -n confluent
+# check for keycload pod
+kubectl get pod -n confluent
 
 # base64-endcoded create
 echo -n "<client_id>:<secret>" | base64
@@ -148,19 +172,25 @@ kubectl create secret generic credential --from-file=plain-users.json=creds-kafk
 # Check if license SecretRef is configured. Modify accordingly
 kubectl apply -f cp_components.yaml -n confluent
 
+# check for Kafka KraftController pods
+kubectl get pod -n confluent --watch
+
 kubectl apply -f cp_crb.yaml -n confluent
 
+k describe confluentrolebinding -n confluent
 ```
 
 #### Validation
 
 ```shell
-
 kubectl get pod -n confluent
 kubectl exec -it pod/kafka-0 -n confluent -- /bin/bash
 ```
 
 ```properties
+# IMPORTANT: truststore password in `/mnt/sslcerts/jksPassword.txt` on that `kafka` pods
+# Adjust clientId and Secret according to your setup
+
 cat <<EOF>/tmp/kafka1.properties
 # kafka1.properties
 sasl.mechanism=OAUTHBEARER
@@ -189,7 +219,7 @@ EOF
 ```shell
 kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9073 --list --command-config /tmp/kafka2.properties
 
-kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9073 --topic test-topic-internal-new --create --replication-factor 3 --command-config /tmp/kafka2.properties
+kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9073 --topic test-topic-internal-new --create --replication-factor 3 --command-config /tmp/kafka1.properties
 
 kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9073 --topic test-topic-internal --create --replication-factor 3 --command-config /tmp/kafka1.properties
 kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9094 --list --command-config /tmp/kafka1.properties
@@ -204,16 +234,24 @@ kafka-topics --bootstrap-server kafka.confluent.svc.cluster.local:9094 --list --
 ### Install CP Flink with security
 
 ```shell
+# Enable Debug --set cmf.logging.level.root=debug
+helm upgrade --install -f flink_security.yaml cmf confluentinc/confluent-manager-for-apache-flink --namespace confluent --set license.secretRef=cp-flink-license --set cmf.logging.level.root=debug
+
+# Watch for CMF pod to be in RUNNING state
+kubectl get pod -n confluent --watch
+
+helm inspect values --version 1.0.1 confluentinc/confluent-manager-for-apache-flink
+
+kubectl get pods -n confluent --watch
+
 # Create CMFRestClass.yaml
+# Cert from CMFRestClass will be used for AuthZ.
+# Create and manage control of CMFRestClass to enable fine grained access for Flink resources
 kubectl apply -f CMFRestClass.yaml -n confluent
 
 kubectl describe CMFRestClass/default -n confluent
 
-helm upgrade --install -f flink_security.yaml cmf confluentinc/confluent-manager-for-apache-flink --namespace confluent --set license.secretRef=cp-flink-license
-
-helm inspect values --version 1.0.1 confluentinc/confluent-manager-for-apache-flink
-
-curl --cert ./generated/server.pem --key ./generated/server-key.pem --cacert generated/ca.pem  https://confluent-manager-for-apache-flink.confluent.svc.cluster.local:8080/cmf/api/v1/environments
+curl --cert ./generated/server.pem --key ./generated/server-key.pem --cacert generated/ca.pem  https://confluent-manager-for-apache-flink.confluent.svc.cluster.local:8079/cmf/api/v1/environments
 ```
 
 ### Run Jobs
@@ -248,14 +286,12 @@ kubectl apply -f flinkapplication.yaml -n confluent
 # Monitor events and pod logs
 kubectl get flinkapplication -n confluent
 
-kubectl port-forward svc/flink-app1-rest 8081:8081 -n confluent
+# Port forwards in above section will let you access the WEB UI
 ```
 
 * Deploy Flink Jobs using `confluent` commands (not recommended for cp-flink production)
 
 ```shell
-kubectl port-forward svc/cmf-service 8080:80 -n confluent
-
 confluent flink environment create env1 --url http://localhost:8080 --kubernetes-namespace confluent
 
 confluent flink application create flink_job.json --environment env1 --url http://localhost:8080
@@ -266,3 +302,14 @@ confluent flink application web-ui-forward basic-example --environment env1 --po
 ### Setup monitoring
 
 TODO
+
+## Troubleshooting
+
+TODO
+
+* FKO Running
+* Check confluentrolebindings
+  * https://confluentinc.atlassian.net/wiki/spaces/OAAC/pages/3539305670/RFC+16.3+-+CP-Flink+RBAC+Summary+and+E2E+user-flow
+* Enable CMF debug
+  * --set cmf.logging.level.root=debug
+* Check for AuthZ errors in CP Kafka pods
