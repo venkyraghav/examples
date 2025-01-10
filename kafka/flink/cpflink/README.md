@@ -54,7 +54,7 @@ keytool -import -v -trustcacerts -keystore ./generated/jks/truststore.jks -store
 # Watch for SAN Names
 keytool -v -list -keystore ./generated/jks/truststore.jks
 
-keytool -v -list -keystore ./generated/jks/keystorestore.jks
+keytool -v -list -keystore ./generated/jks/keystore.jks
 
 ```
 
