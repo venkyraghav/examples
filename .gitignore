@@ -14,11 +14,14 @@
 **/.idea
 **/.gradle
 **/.settings
+**/.project
 **/*.iml
 **/build
 **/gradle
 **/pkg
-
+**/*.tfstate
+**/*.tfstate.backup
+**/pssession/*
 # Package Files #
 **/*.jar
 **/*.war

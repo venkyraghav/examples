@@ -34,6 +34,18 @@ variable "confluent_cloud_network" {
   type        = string
 }
 
+variable "rw_topics" {
+  description = "List of read-write topics"
+  type        = list(string)
+  default     = [""]
+}
+
+variable "ro_topics" {
+  description = "List of read-only topics"
+  type        = list(string)
+  default     = [""]
+}
+
 variable "tag_owner_email" {
   description = "Owner email id - responsible person"
   type        = string

@@ -1,11 +1,12 @@
+# FlinkApplication.yaml
 apiVersion: platform.confluent.io/v1beta1
 kind: FlinkApplication
 metadata:
-  name: flink-app1
+  name: flink-app-shoes
   namespace: confluent
 spec:
   flinkEnvironment: flink-env1
-  image: confluentinc/cp-flink:1.19.1-cp1
+  image: venkyraghav941/flink-app-shoes:v3
   flinkVersion: v1_19
   # flinkConfiguration:
   #  taskmanager.numberOfTaskSlots: 2
@@ -19,7 +20,7 @@ spec:
       memory: 1048m
       cpu: 1
   job:
-    jarURI: local:///opt/flink/examples/streaming/StateMachineExample.jar
+    jarURI: local:///opt/flink/shoes-app-0.1.jar
     state: running
     parallelism: 3
     upgradeMode: stateless

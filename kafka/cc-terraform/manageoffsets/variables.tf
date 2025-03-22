@@ -19,18 +19,54 @@ variable "topic_name" {
   type        = string
 }
 
+variable "connector_name" {
+  description = "Name of the connector."
+  type        = string
+}
+
+variable "mongo_password" {
+  description = "mongoDB Password."
+  type        = string
+}
+
+variable "db_user" {
+  description = "DB UserID."
+  type        = string
+}
+
+variable "db_password" {
+  description = "DB Password."
+  type        = string
+}
+
+variable "db_host" {
+  description = "DB Host."
+  type        = string
+}
+
+variable "db_port" {
+  description = "DB Port."
+  type        = string
+}
+
 variable "confluent_cloud_cluster" {
   description = "Confluent Cluster ID."
   type        = string
 }
 
-variable "confluent_cloud_env" {
-  description = "Confluent cloud environment id"
+
+variable "cc_venky_cluster_api_key" {
+  description = "Confluent Cluster scope API Key."
   type        = string
 }
 
-variable "confluent_cloud_network" {
-  description = "Confluent cloud network"
+variable "cc_venky_cluster_api_secret" {
+  description = "Confluent Cluster scope API Secret."
+  type        = string
+}
+
+variable "confluent_cloud_env" {
+  description = "Confluent cloud environment id"
   type        = string
 }
 

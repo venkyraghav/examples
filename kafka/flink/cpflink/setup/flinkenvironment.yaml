@@ -2,9 +2,9 @@ apiVersion: platform.confluent.io/v1beta1
 kind: FlinkEnvironment
 metadata:
   name: flink-env1
-  namespace: confluent
+  namespace: flink
 spec:
-  kubernetesNamespace: confluent
+  kubernetesNamespace: flink
   flinkApplicationDefaults:
     spec:
       flinkConfiguration:
@@ -14,4 +14,4 @@ spec:
         rest.profiling.enabled: true
   cmfRestClassRef:
     name: default
-    namespace: confluent
+    namespace: cpf
