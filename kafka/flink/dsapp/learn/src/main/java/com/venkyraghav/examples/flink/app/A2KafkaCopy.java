@@ -37,6 +37,7 @@ public class A2KafkaCopy extends ClientCommand {
     @Override
     public Integer process() {
         env = StreamExecutionEnvironment.getExecutionEnvironment();
+        String topic = "transactions";
 
         // set up a Kafka source
         KafkaSource<Transaction> transactionSource =
@@ -44,7 +45,7 @@ public class A2KafkaCopy extends ClientCommand {
                 .setStartingOffsets(OffsetsInitializer.earliest())
                 .setProperties(getProperties())
                 .setBootstrapServers(getBootstrapServer(null))
-                .setTopics("transactions")
+                .setTopics(topic)
                 .setValueOnlyDeserializer(new TransactionSerde())
                 .build();
 
@@ -52,9 +53,10 @@ public class A2KafkaCopy extends ClientCommand {
         //    env.fromSource(transactionSource, WatermarkStrategy.noWatermarks(), "Transactions");
 
         KafkaSink<Transaction> sink = KafkaSink.<Transaction>builder()
+                .setKafkaProducerConfig(getProperties())
                 .setBootstrapServers(getBootstrapServer(null))
                 .setRecordSerializer(KafkaRecordSerializationSchema.builder()
-                    .setTopic("transaction_copy")
+                    .setTopic(topic + "_copy")
                     .setValueSerializationSchema(new TransactionSerde())
                     .build())
                 .setDeliveryGuarantee(DeliveryGuarantee.EXACTLY_ONCE)
@@ -100,6 +102,7 @@ public class A2KafkaCopy extends ClientCommand {
             stream.sinkTo(sink);
 
             env.execute("Kafka Copier");
+            Thread.sleep(1000000L);
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
