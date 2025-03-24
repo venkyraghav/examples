@@ -18,10 +18,15 @@ public class A0SimplePrint extends ClientCommand {
     private StreamExecutionEnvironment env;
 
     @Override
-    protected void cleanup() throws Exception {
+    protected void cleanup() {
         if (env != null) {
             if (LOGGER.isInfoEnabled()) {LOGGER.info("Cleaning up...");}
-            env.close();
+            try {
+                keepRunning = false;
+                env.close();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
@@ -34,7 +39,7 @@ public class A0SimplePrint extends ClientCommand {
     public Integer process() {
         env = StreamExecutionEnvironment.getExecutionEnvironment();
         try {
-            for (int i = 0; i < 50; i++) {
+            for (int i = 0; i < 50 && keepRunning; i++) {
                 env.fromElements(CUSTOMERS)
                         .executeAndCollect()
                         .forEachRemaining(System.out::println);

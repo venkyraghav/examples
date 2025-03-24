@@ -18,8 +18,10 @@ public abstract class ClientCommand implements Callable<Integer> {
     @CommandLine.Option(names = {"-c", "--command.config"}, paramLabel = "COMMAND.CONFIG", description = "File with Configuration Parameters to Flink Client", required = false, converter = FileExistsConverter.class)
     private String commandConfig;
 
+    protected volatile boolean keepRunning = true;
+
     protected abstract Integer process();
-    protected abstract void cleanup() throws Exception;
+    protected abstract void cleanup();
 
     private Properties props;
 
@@ -56,6 +58,7 @@ public abstract class ClientCommand implements Callable<Integer> {
     @Override
     public Integer call() throws Exception {
         try {
+            Runtime.getRuntime().addShutdownHook(new Thread(this::cleanup));
             validate();
         } catch (MissingParameterException e) {
             System.out.println("Exception: " + e.getMessage());

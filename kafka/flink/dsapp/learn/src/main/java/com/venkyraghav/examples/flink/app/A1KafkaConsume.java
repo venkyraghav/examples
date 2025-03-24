@@ -25,10 +25,15 @@ public class A1KafkaConsume extends ClientCommand {
     private StreamExecutionEnvironment env;
 
     @Override
-    protected void cleanup() throws Exception {
+    protected void cleanup() {
         if (env != null) {
             if (LOGGER.isInfoEnabled()) {LOGGER.info("Cleaning up...");}
-            env.close();
+            try {
+                keepRunning = false;
+                env.close();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 

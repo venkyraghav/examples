@@ -4,25 +4,16 @@ import com.venkyraghav.examples.flink.model.Transaction;
 import com.venkyraghav.examples.flink.serializer.TransactionSerde;
 import com.venkyraghav.examples.flink.util.ClientCommand;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.serialization.SimpleStringSchema;
-import org.apache.flink.api.common.state.ValueState;
-import org.apache.flink.api.common.state.ValueStateDescriptor;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
 import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
-import org.apache.flink.formats.json.JsonSerializationSchema;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
-import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
-
-import java.time.Duration;
 
 @Command(name = "02_kafkacopy", mixinStandardHelpOptions = true, usageHelpAutoWidth = true, showDefaultValues = true)
 public class A2KafkaCopy extends ClientCommand {
@@ -31,11 +22,16 @@ public class A2KafkaCopy extends ClientCommand {
     private StreamExecutionEnvironment env;
 
     @Override
-    protected void cleanup() throws Exception {
-//        if (env != null) {
-//            if (LOGGER.isInfoEnabled()) {LOGGER.info("Cleaning up...");}
-//            env.close();
-//        }
+    protected void cleanup() {
+        if (env != null) {
+            if (LOGGER.isInfoEnabled()) {LOGGER.info("Cleaning up...");}
+            try {
+                keepRunning = false;
+                env.close();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     @Override
@@ -59,7 +55,6 @@ public class A2KafkaCopy extends ClientCommand {
                 .setBootstrapServers(getBootstrapServer(null))
                 .setRecordSerializer(KafkaRecordSerializationSchema.builder()
                     .setTopic("transaction_copy")
-                    .setKeySerializationSchema(new )
                     .setValueSerializationSchema(new TransactionSerde())
                     .build())
                 .setDeliveryGuarantee(DeliveryGuarantee.EXACTLY_ONCE)
@@ -100,7 +95,7 @@ public class A2KafkaCopy extends ClientCommand {
                     })
                     .sinkTo(sink).name("Copy transactions to transactions_copy");
                     */
-            DataStream<String> stream = env.fromSource(transactionSource, WatermarkStrategy.noWatermarks(), "Kafka Source");
+            DataStream<Transaction> stream = env.fromSource(transactionSource, WatermarkStrategy.noWatermarks(), "Kafka Source");
             stream.print();
             stream.sinkTo(sink);
 
@@ -108,7 +103,7 @@ public class A2KafkaCopy extends ClientCommand {
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
-            // try { cleanup(); } catch (Exception ignored){}
+             try { cleanup(); } catch (Exception ignored){}
         }
         return 0;
     }
