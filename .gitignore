@@ -50,3 +50,8 @@ hs_err_pid*
 **/.terraform/**
 **/.terraform.lock.hcl
 **/terraform.tfstate.d/**
+**/dependency-reduced-pom.xml
+**/gradlew
+**/gradlew.bat
+**/*.bak
+
