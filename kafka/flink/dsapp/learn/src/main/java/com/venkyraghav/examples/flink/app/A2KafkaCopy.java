@@ -22,19 +22,6 @@ public class A2KafkaCopy extends ClientCommand {
     private StreamExecutionEnvironment env;
 
     @Override
-    protected void cleanup() {
-        if (env != null) {
-            if (LOGGER.isInfoEnabled()) {LOGGER.info("Cleaning up...");}
-            try {
-                keepRunning = false;
-                env.close();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    @Override
     public Integer process() {
         env = StreamExecutionEnvironment.getExecutionEnvironment();
         String topic = "transactions";
@@ -102,11 +89,8 @@ public class A2KafkaCopy extends ClientCommand {
             stream.sinkTo(sink);
 
             env.execute("Kafka Copier");
-            Thread.sleep(1000000L);
         } catch (Exception e) {
             throw new RuntimeException(e);
-        } finally {
-             try { cleanup(); } catch (Exception ignored){}
         }
         return 0;
     }

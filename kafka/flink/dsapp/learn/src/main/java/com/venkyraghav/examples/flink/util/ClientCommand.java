@@ -2,7 +2,6 @@ package com.venkyraghav.examples.flink.util;
 
 import com.venkyraghav.examples.flink.util.picocli.ArgException;
 import com.venkyraghav.examples.flink.util.picocli.FileExistsConverter;
-import jdk.jshell.execution.Util;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.utils.Utils;
@@ -14,6 +13,8 @@ import java.nio.file.Paths;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 
+import static java.lang.Thread.sleep;
+
 public abstract class ClientCommand implements Callable<Integer> {
     @CommandLine.Option(names = {"-c", "--command.config"}, paramLabel = "COMMAND.CONFIG", description = "File with Configuration Parameters to Flink Client", required = false, converter = FileExistsConverter.class)
     private String commandConfig;
@@ -21,7 +22,6 @@ public abstract class ClientCommand implements Callable<Integer> {
     protected volatile boolean keepRunning = true;
 
     protected abstract Integer process();
-    protected abstract void cleanup();
 
     private Properties props;
 
@@ -58,13 +58,17 @@ public abstract class ClientCommand implements Callable<Integer> {
     @Override
     public Integer call() throws Exception {
         try {
-            Runtime.getRuntime().addShutdownHook(new Thread(this::cleanup));
+            // Runtime.getRuntime().addShutdownHook(new Thread(this::cleanup));
             validate();
+            process();
+//            while (keepRunning) {
+//                try { sleep(10000L);} catch (Exception ignored) {}
+//            }
         } catch (MissingParameterException e) {
             System.out.println("Exception: " + e.getMessage());
             throw e;
         }
-        return process();
+        return 0;
     }
 
     protected Properties loadCommandConfig(String commandConfig) throws ArgException {

@@ -17,19 +17,6 @@ public class A0SimplePrint extends ClientCommand {
     private static final Logger LOGGER = LoggerFactory.getLogger(A0SimplePrint.class);
     private StreamExecutionEnvironment env;
 
-    @Override
-    protected void cleanup() {
-        if (env != null) {
-            if (LOGGER.isInfoEnabled()) {LOGGER.info("Cleaning up...");}
-            try {
-                keepRunning = false;
-                env.close();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
     public static final Customer[] CUSTOMERS = new Customer[] {
         new Customer(12L, "Alice", LocalDate.of(1984, 3, 12)),
         new Customer(32L, "Bob", LocalDate.of(1990, 10, 14)),
@@ -51,8 +38,6 @@ public class A0SimplePrint extends ClientCommand {
             }
         } catch (Exception e) {
             LOGGER.error("Exception ", e);
-        } finally {
-            try { cleanup(); } catch (Exception ignored){}
         }
         return 0;
     }

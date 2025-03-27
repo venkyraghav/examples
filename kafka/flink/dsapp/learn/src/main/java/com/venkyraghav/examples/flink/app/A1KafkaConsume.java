@@ -24,18 +24,6 @@ public class A1KafkaConsume extends ClientCommand {
     private static final Logger LOGGER = LoggerFactory.getLogger(A1KafkaConsume.class);
     private StreamExecutionEnvironment env;
 
-    @Override
-    protected void cleanup() {
-        if (env != null) {
-            if (LOGGER.isInfoEnabled()) {LOGGER.info("Cleaning up...");}
-            try {
-                keepRunning = false;
-                env.close();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
 
     @Override
     public Integer process() {
@@ -94,8 +82,6 @@ public class A1KafkaConsume extends ClientCommand {
                 });
         } catch (Exception e) {
             throw new RuntimeException(e);
-        } finally {
-            try { cleanup(); } catch (Exception ignored){}
         }
         return 0;
     }

@@ -31,14 +31,14 @@ under the License.
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <cp-flink.connector.version>3.3.0-1.19-cp1</cp-flink.connector.version>
-        <cp-flink.version>1.19.1-cp1</cp-flink.version>
+        <cp-flink.version>1.19.1-cp2</cp-flink.version>
         <target.java.version>11</target.java.version>
         <scala.binary.version>2.12</scala.binary.version>
         <maven.compiler.source>${target.java.version}</maven.compiler.source>
         <maven.compiler.target>${target.java.version}</maven.compiler.target>
         <log4j.version>2.17.1</log4j.version>
         <slf4j.version>1.7.36</slf4j.version>
-        <cp-kafka.version>3.9.0</cp-kafka.version>
+        <cp-kafka.version>3.7.0</cp-kafka.version>
     </properties>
 
     <repositories>
