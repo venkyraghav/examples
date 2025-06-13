@@ -38,7 +38,6 @@
             <artifactId>jolt-core</artifactId>
             <version>0.1.8</version>
         </dependency>
-
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>connect-api</artifactId>
@@ -53,16 +52,24 @@
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.2.0</version>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.10.0</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.10.0</version>
+            <scope>test</scope>
+        </dependency>
+        <!--
         <dependency>
             <groupId>org.junit.platform</groupId>
             <artifactId>junit-platform-runner</artifactId>
             <version>1.2.0</version>
             <scope>test</scope>
         </dependency>
+        -->
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
@@ -72,7 +79,19 @@
         </dependency>
     </dependencies>
     <build>
+        <testSourceDirectory>src/test/java</testSourceDirectory>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.0.0</version>
+                <configuration>
+                    <includes>
+                        <include>**/*Test.java</include>
+                    </includes>
+                    <useModulePath>false</useModulePath>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
