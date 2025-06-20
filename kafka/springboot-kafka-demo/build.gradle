@@ -1,0 +1,58 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.3.1'
+	id 'io.spring.dependency-management' version '1.1.4'
+    id "com.google.protobuf" version "0.9.5"
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	sourceCompatibility = '17'
+}
+
+bootRun {
+	// use while doing gradle bootRun -PjmxPort=28082
+	def jmxPort = project.hasProperty('jmxPort') ? project.getProperty('jmxPort') : '28081'
+    jvmArgs = [
+        "-javaagent:/Users/venky/Desktop/git-commit/examples/kafka/scripts/jar/jmx_prometheus_javaagent-0.16.1.jar=${jmxPort}:/Users/venky/github.com/venkyraghav/examples/kafka/scripts/prop/kafka_client.yml"
+    ]
+}
+
+repositories {
+	mavenCentral()
+
+	maven {
+		url "https://packages.confluent.io/maven"
+	}
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter'
+	implementation 'org.springframework.kafka:spring-kafka'
+	implementation 'org.apache.kafka:kafka-clients'
+	implementation 'io.confluent:kafka-json-schema-serializer:7.6.3'
+	implementation 'com.fasterxml.jackson.core:jackson-databind'
+	implementation 'com.fasterxml.jackson.core:jackson-core'
+	implementation 'com.fasterxml.jackson.core:jackson-annotations'
+	implementation 'com.google.protobuf:protobuf-java:3.25.0'
+    implementation "io.confluent:kafka-protobuf-serializer:7.6.3"
+    implementation "io.confluent:kafka-protobuf-provider:7.6.3"
+
+    testImplementation 'com.google.guava:guava:31.1-jre'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.kafka:spring-kafka-test'
+}
+
+protobuf {
+    generatedFilesBaseDir = "${project.buildDir}/generated-main-proto-java"
+
+    protoc {
+        artifact = 'com.google.protobuf:protoc:3.25.0'
+    }
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
