@@ -24,6 +24,16 @@ public class JsonFlatten extends ScalarFunction {
     }
 
     /**
+     * Flattens the given JSON byte array using the default separator (".").
+     *
+     * @param json the JSON byte array to flatten
+     * @return the flattened JSON string
+     */
+    public String eval(byte[] json) {
+        return eval(new String(json), ".");
+    }
+
+    /**
      * Flattens the given JSON string with provided separator.
      *
      * @param json the JSON string to flatten

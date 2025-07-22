@@ -8,18 +8,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class JsonFlattenTest {
-
-    private String minifyJson(String prettyJson) {
-        if (prettyJson.isBlank()) {
-            return "";
-        }
-        ObjectMapper mapper = new ObjectMapper();
-        JsonNode tree;
+    private void assertJson(String expectedJson, String actualJson) {
         try {
-            tree = mapper.readTree(prettyJson);
-            return mapper.writeValueAsString(tree);
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode expected = mapper.readTree(expectedJson);
+            JsonNode actual = mapper.readTree(actualJson);
+            assertThat(actual).isEqualTo(expected);
         } catch (JsonProcessingException ex) {
-            return "{\"exception\":" + ex.getLocalizedMessage() + "}";
+            ex.printStackTrace();
+            assertThat(false);
         }
     }
 
@@ -36,9 +33,29 @@ public class JsonFlattenTest {
             """;
 
         String got = new JsonFlatten().eval(input);
-        assertThat(got).isEqualTo(minifyJson(expected));
+        assertJson(expected, got);
     }
 
+    @Test
+    public void testSimpleJsonByteArray() {
+        String input = """
+            {
+                "id": "1",
+                "name": "John Doe",
+                "age": "30"
+            }
+            """;
+        String expected = """
+            {
+            "id": "1",
+            "name": "John Doe",
+            "age": "30"
+            }
+            """;
+
+        String got = new JsonFlatten().eval(input.getBytes());
+        assertJson(expected, got);
+    }
     @Test
     public void testSimpleJson() {
         String input = """
@@ -57,7 +74,7 @@ public class JsonFlattenTest {
             """;
 
         String got = new JsonFlatten().eval(input);
-        assertThat(got).isEqualTo(minifyJson(expected));
+        assertJson(expected, got);
     }
 
     @Test
@@ -82,7 +99,7 @@ public class JsonFlattenTest {
             """;
 
         String got = new JsonFlatten().eval(input);
-        assertThat(got).isEqualTo(minifyJson(expected));
+        assertJson(expected, got);
     }
 
     @Test
@@ -118,7 +135,7 @@ public class JsonFlattenTest {
             """;
 
         String got = new JsonFlatten().eval(input);
-        assertThat(got).isEqualTo(minifyJson(expected));
+        assertJson(expected, got);
     }
 
     @Test
@@ -164,7 +181,7 @@ public class JsonFlattenTest {
             """;
 
         String got = new JsonFlatten().eval(input);
-        assertThat(got).isEqualTo(minifyJson(expected));
+        assertJson(expected, got);
     }
 
 
@@ -190,6 +207,6 @@ public class JsonFlattenTest {
             """;
 
         String got = new JsonFlatten().eval(input, "_");
-        assertThat(got).isEqualTo(minifyJson(expected));
+        assertJson(expected, got);
     }
 }
