@@ -1,82 +1,17 @@
 #!/bin/bash
 
-
-#!/bin/bash
-
 # Usage
 Usage() {
     echo "Usage: ${PROG_NAME} "
     echo "  -D|--dry-run: perform dry run (default: false)"
-    echo "  -c|--components: Components to stop takes care of dependency. Values all, zk, ak, sr, rest, connect ksql, c3 (default: all)"
+    echo "  -c|--components: Components to stop takes care of dependency. Values all, zk, ak, sr, rest, connect c3 (default: all)"
     echo "  -h|--help: print help"
-}
-
-MyEcho() {
-    echo [`date +"%Y-%m-%d %H:%M:%S"`] $1 $2
-}
-
-GenerateDependency() {
-    STOP_ZK=0
-    STOP_AK=0
-    STOP_SR=0
-    STOP_REST=0
-    STOP_KSQL=0
-    STOP_CONNECT=0
-    STOP_C3=0
-    comparg=${COMPONENTS}
-    OLDIFS="$IFS"
-    for comp in ${COMPONENTS}
-    do
-        case ${COMPONENTS} in
-        all|zk)
-            STOP_ZK=1
-            STOP_AK=1
-            STOP_SR=1
-            STOP_REST=1
-            STOP_KSQL=1
-            STOP_CONNECT=1
-            STOP_C3=1
-            break
-            ;;
-        c3)
-            STOP_C3=1
-            ;;
-        ak)
-            STOP_AK=1
-            STOP_SR=1
-            STOP_REST=1
-            STOP_KSQL=1
-            STOP_CONNECT=1
-            STOP_C3=1
-            ;;
-        sr)
-            STOP_SR=1
-            STOP_REST=1
-            STOP_KSQL=1
-            STOP_CONNECT=1
-            STOP_C3=1
-            ;;
-        rest)
-            STOP_REST=1
-            STOP_C3=1
-            ;;
-        ksql)
-            STOP_KSQL=1
-            STOP_C3=1
-            ;;
-        connect)
-            STOP_CONNECT=1
-            STOP_C3=1
-            ;;
-        esac
-    done
-    IFS=${OLDIFS}
 }
 
 # Validate
 Validate() {
     case ${COMPONENTS} in
-        all|ak|zk|sr|rest|ksql|connect|c3)
+        all|ak|zk|sr|rest|connect|c3)
         export COMPONENTS
         ;;
         *)
@@ -186,10 +121,6 @@ RunProcess() {
 
     if [[ ${STOP_CONNECT} -eq 1 ]] ; then
         StopProcess "CONNECT"
-    fi
-
-    if [[ ${STOP_KSQL} -eq 1 ]] ; then
-        StopProcess "KSQL"
     fi
 
     if [[ ${STOP_REST} -eq 1 ]] ; then

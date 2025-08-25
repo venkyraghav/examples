@@ -1,6 +1,12 @@
 #!/bin/bash
 
+export MY_IP=$(ifconfig en0 | grep inet | awk '$1=="inet" {print $2}')
+
 ENV_NAME=MY.LOCAL
+
+GetNodePattern() {
+    echo "-D${ENV_NAME} -Dnode=${NODE_TYPE} -Dnode-id=${NODE_ID}"
+}
 
 MyEcho() {
     echo [`date +"%Y-%m-%d %H:%M:%S"`] $1 $2
@@ -22,112 +28,250 @@ AbsDir() {
     ABSPATH=$( AbsPath ${base_dir} )
 }
 
-RunJ2() {
-    if [[ ! -f $1 ]]; then
-        MyEcho "ERROR" "$1 does not exist"
+CheckFileOrExit() {
+    if [[ ! -f ${1} ]] ; then
+        MyEcho "ERROR" "${1} does not exist"
         exit 1
     fi
+}
+
+CheckDirectoryOrExit() {
+    if [[ ! -d ${2} ]] ; then
+        MyEcho "ERROR" "${1} -> ${2} does not exist"
+        exit 1
+    fi
+}
+
+CheckExecutableOrExit() {
+    if [[ ! -x $(which ${1}) ]] ; then
+        MyEcho "ERROR" "${1} is not in path"
+        exit 1
+    fi
+}
+
+CheckExistOrDownload() {
+    JOLOKIA_JAR="${1}/${2}"
+    if [[ ! -f ${JOLOKIA_JAR} ]] ; then
+        wget "${3}" -P "${1}"/
+    fi
+}
+
+GenerateDependency() {
+    MyEcho "INFO" "GenerateDependency ${COMPONENTS}"
+    STOP_ZK=0
+    START_ZK=0
+    STOP_AK=0
+    START_AK=0
+    STOP_SR=0
+    START_SR=0
+    STOP_REST=0
+    START_REST=0
+    STOP_CONNECT=0
+    START_CONNECT=0
+    STOP_C3=0
+    START_C3=0
+    comparg=${COMPONENTS}
+    OLDIFS="$IFS"
+    for comp in ${COMPONENTS}
+    do
+        case ${COMPONENTS} in
+        all|zk)
+            STOP_ZK=1
+            STOP_AK=1
+            STOP_SR=1
+            STOP_REST=1
+            STOP_CONNECT=1
+            STOP_C3=1
+            START_ZK=1
+            START_AK=1
+            START_SR=1
+            START_CONNECT=1
+            START_C3=1
+            break
+            ;;
+        c3)
+            STOP_C3=1
+            START_ZK=1
+            START_AK=1
+            START_SR=1
+            START_CONNECT=1
+            START_C3=1
+            ;;
+        ak)
+            STOP_AK=1
+            STOP_SR=1
+            STOP_REST=1
+            STOP_CONNECT=1
+            STOP_C3=1
+            START_ZK=1
+            START_AK=1
+            ;;
+        sr)
+            STOP_SR=1
+            STOP_REST=1
+            STOP_CONNECT=1
+            STOP_C3=1
+            START_ZK=1
+            START_AK=1
+            START_SR=1
+            ;;
+        rest)
+            STOP_REST=1
+            STOP_C3=1
+            START_ZK=1
+            START_AK=1
+            START_SR=1
+            ;;
+        connect)
+            STOP_CONNECT=1
+            STOP_C3=1
+            START_ZK=1
+            START_AK=1
+            START_SR=1
+            START_CONNECT=1
+            ;;
+        esac
+    done
+    IFS=${OLDIFS}
+}
+
+CheckRunning() {
+    PATTERN_ARG=$1
+    PATTERN="\-D${ENV_NAME} \-Dnode=${PATTERN_ARG}"
+    MyEcho "INFO" "CheckRunning for ${PATTERN}"
+    RUNNING=`ps -ef|grep java|grep "${PATTERN}"|grep -v grep|awk '{print $2}'|wc -l|sed 's/ //g'`
+}
+
+CheckProcessNotRunningOrExit() {
+    CheckRunning "${1}"
+    if [[ "${RUNNING}" -ne 0 ]]; then
+        MyEcho "INFO" "${1} is already running. Exiting now ..."
+        exit 0
+    fi
+}
+
+CheckNodeNotRunningOrExit() {
+    NODE_TYPE=$1
+    NODE_ID=$2
+    PATTERN="\-D${ENV_NAME} \-Dnode=${NODE_TYPE} \-Dnode-id=${NODE_ID}"
+    MyEcho "INFO" "CheckNodeNotRunningOrExit for ${PATTERN}"
+    RUNNING=`ps -ef|grep java|grep "${PATTERN}"|grep -v grep|awk '{print $2}'|wc -l|sed 's/ //g'`
+    if [[ "${RUNNING}" -ne 0 ]]; then
+        MyEcho "INFO" "${1} is already running. Exiting now ..."
+        exit 0
+    fi
+}
+
+CheckCPRunning() {
+    CheckRunning "ZK"
+    RUNNING_ZK=${RUNNING}
+    CheckRunning "AK"
+    RUNNING_AK=${RUNNING}
+    CheckRunning "SR"
+    RUNNING_SR=${RUNNING}
+    CheckRunning "REST"
+    RUNNING_REST=${RUNNING}
+    CheckRunning "CONNECT"
+    RUNNING_CONNECT=${RUNNING}
+    CheckRunning "C3"
+    RUNNING_C3=${RUNNING}
+
+    RUNNING_CP=$(( $RUNNING_AK + $RUNNING_C3 + $RUNNING_CONNECT + $RUNNING_CP + $RUNNING_REST + $RUNNING_SR + $RUNNING_ZK ))
+}
+
+RunJ2() {
+    CheckFileOrExit ${1}
     if [[ -f $2 ]]; then
         MyEcho "WARN" "$2 exist. Overwriting ..."
     fi
+    MyEcho "ERROR" "Why are you generating JINJA files?"
     jinja2 $1 > $2
+}
+
+RunEnvsubst() {
+    CheckFileOrExit ${1}
+    if [[ -f $2 ]]; then
+        MyEcho "WARN" "$2 exist. Overwriting ..."
+    fi
+    envsubst < $1 > $2
+}
+
+CheckCPTemplate() {
+    CheckFileOrExit "${TEMPLATE_DIR}/server-${1}.properties.template"
+    CheckFileOrExit "${TEMPLATE_DIR}/schema-registry-${1}.properties.template"
+    CheckFileOrExit "${TEMPLATE_DIR}/connect-distributed-${1}.properties.template"
+    CheckFileOrExit "${TEMPLATE_DIR}/control-center-${1}.properties.template"
 }
 
 Precheck() {
     AbsDir
-    SCRIPT_DIR=${ABSPATH}
-    JAR_DIR=$( CheckOrCreateDir ${ABSPATH}/../jar )
-    GEN_DIR=$( CheckOrCreateDir ${ABSPATH}/../generated )
-    PROP_DIR=${ABSPATH}/../prop
-    CFG_DIR=$( CheckOrCreateDir ${GEN_DIR}/config )
+    export SCRIPT_DIR=${ABSPATH}
+    export JAR_DIR=$( CheckOrCreateDir ${ABSPATH}/../jar )
+    export GEN_DIR=$( CheckOrCreateDir ${ABSPATH}/../generated )
+    export PROP_DIR=${ABSPATH}/../prop
+    export CFG_DIR=$( CheckOrCreateDir ${GEN_DIR}/config )
     export DATA_DIR=$( CheckOrCreateDir ${GEN_DIR}/data )
     export LOG_DIR=$( CheckOrCreateDir ${GEN_DIR}/logs )
-    J2_DIR=${ABSPATH}/../j2
-    STATE_FILE=${DATA_DIR}/.state
+    export J2_DIR=${ABSPATH}/../j2
+    export TEMPLATE_DIR=${ABSPATH}/../template
+    export STATE_FILE=${DATA_DIR}/.state
 
-    if [[ ! -d ${CONFLUENT_HOME} ]] ; then
-        MyEcho "ERROR" "CONFLUENT_HOME is not set"
-        exit 1
-    fi
-    if [[ ! -d ${JAVA_HOME} ]] ; then
-        MyEcho "ERROR" "JAVA_HOME is not set"
-        exit 1
-    fi
-    
-    if [[ ! -d ${J2_DIR} ]] ; then
-        MyEcho "ERROR" "J2_DIR ${J2_DIR} is not set"
-        exit 1
+    CheckDirectoryOrExit "CONFLUENT_HOME" "${CONFLUENT_HOME}"
+    CheckDirectoryOrExit "JAVA_HOME" "${JAVA_HOME}"
+    CheckDirectoryOrExit "TEMPLATE_DIR" "${TEMPLATE_DIR}"
+    CheckDirectoryOrExit "PROP_DIR" "${PROP_DIR}"
 
-    fi
-    if [[ ! -d ${PROP_DIR} ]] ; then
-        MyEcho "ERROR" "PROP_DIR ${PROP_DIR} is not set"
-        exit 1
-    fi
+    CheckExecutableOrExit "kafka-server-start"
+    CheckExecutableOrExit "zookeeper-server-start"
+    CheckExecutableOrExit "wget"
+    CheckExecutableOrExit "envsubst"
+    CheckExecutableOrExit "jq"
+    # CheckExecutableOrExit "yq"
 
-    if [[ ! -x $(which kafka-server-start) ]] ; then
-        MyEcho "ERROR" "kafka-server-start is not in path"
-        exit 1
-    fi
-    if [[ ! -x $(which zookeeper-server-start) ]] ; then
-        MyEcho "ERROR" "zookeeper-server-start is not in path"
-        exit 1
-    fi
+    CheckExistOrDownload "${JAR_DIR}" "jolokia-jvm-1.6.2-agent.jar" "https://repo1.maven.org/maven2/org/jolokia/jolokia-jvm/1.6.2/jolokia-jvm-1.6.2-agent.jar"
+    CheckExistOrDownload "${JAR_DIR}" "jmx_prometheus_javaagent-0.16.1.jar" "https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.16.1/jmx_prometheus_javaagent-0.16.1.jar"
 
-    if [[ ! -x $(which wget) ]] ; then
-        MyEcho "ERROR" "wget is not installed"
-        exit 1
-    fi
-    if [[ ! -x $(which jinja2) ]] ; then
-        MyEcho "ERROR" "jinja2 is not installed"
-        exit 1
-    fi
+    CheckFileOrExit "${PROP_DIR}/kafka_broker.yml"
+    CheckFileOrExit "${PROP_DIR}/zookeeper.yml"
+    CheckFileOrExit "${PROP_DIR}/kafka_client.yml"
+    CheckFileOrExit "${PROP_DIR}/kafka_streams.yml"
 
-    JOLOKIA_JAR=${JAR_DIR}/jolokia-jvm-1.6.2-agent.jar
-    if [[ ! -f ${JOLOKIA_JAR} ]] ; then
-        wget https://repo1.maven.org/maven2/org/jolokia/jolokia-jvm/1.6.2/jolokia-jvm-1.6.2-agent.jar -P ${JAR_DIR}/
-    fi
-    JMX_PROM_JAR=${JAR_DIR}/jmx_prometheus_javaagent-0.16.1.jar
-    if [[ ! -f ${JMX_PROM_JAR} ]] ; then
-        wget https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.16.1/jmx_prometheus_javaagent-0.16.1.jar -P ${JAR_DIR}/
-    fi
+    CheckFileOrExit "${TEMPLATE_DIR}/zookeeper.properties.template"
+    CheckFileOrExit "${TEMPLATE_DIR}/jolokia.properties.template"
+    CheckFileOrExit "${TEMPLATE_DIR}/log4j.properties.template"
+    CheckCPTemplate "noauth"
+    # TODO add more authN types after generating template files
+}
 
-    if [[ ! -f ${PROP_DIR}/kafka_broker.yml ]] ; then
-        MyEcho "ERROR" "${PROP_DIR}/kafka_broker.yml does not exist"
+ValidateAuthNMethodOrExit() {
+    AUTHN=$1
+    case ${AUTHN} in
+        noauth|plain|scram|gssapi|rbac)
+        export AUTHN
+        ;;
+        *)
+        MyEcho "ERROR" "Unknown value ${AUTHN} for option -a or --authn"
+        Usage
         exit 1
-    fi
+        ;;
+    esac
+}
 
-    if [[ ! -f ${PROP_DIR}/zookeeper.yml ]] ; then
-        MyEcho "ERROR" "${PROP_DIR}/zookeeper.yml does not exist"
+ValidateNodeIDOrExit() {
+    NODE_ID=${1}
+    if [[ ${NODE_ID} -lt 0 ]] ; then
+        MyEcho "ERROR" "node id must be greater than 0. provided ${NODE_ID} for ${NODE_TYPE}"
+        Usage
         exit 1
     fi
+}
 
-    if [[ ! -f ${J2_DIR}/zookeeper.properties.j2 ]] ; then
-        MyEcho "ERROR" "${J2_DIR}/zookeeper.properties.j2 does not exist"
-        exit 1
-    fi
-
-    if [[ ! -f ${J2_DIR}/server-noauth.properties.j2 ]] ; then
-        MyEcho "ERROR" "${J2_DIR}/server-noauth.properties.j2 does not exist"
-        exit 1
-    fi
-    if [[ ! -f ${J2_DIR}/server-plain.properties.j2 ]] ; then
-        MyEcho "ERROR" "${J2_DIR}/server-plain.properties.j2 does not exist"
-        exit 1
-    fi
-    if [[ ! -f ${J2_DIR}/server-scram.properties.j2 ]] ; then
-        MyEcho "ERROR" "${J2_DIR}/server-scram.properties.j2 does not exist"
-        exit 1
-    fi
-    if [[ ! -f ${J2_DIR}/server-rbac.properties.j2 ]] ; then
-        MyEcho "ERROR" "${J2_DIR}/server-rbac.properties.j2 does not exist"
-        exit 1
-    fi
-    if [[ ! -f ${J2_DIR}/jolokia.properties.j2 ]] ; then
-        MyEcho "ERROR" "${J2_DIR}/jolokia.properties.j2 does not exist"
-        exit 1
-    fi
-    if [[ ! -f ${J2_DIR}/log4j.properties.j2 ]] ; then
-        MyEcho "ERROR" "${J2_DIR}/log4j.properties.j2 does not exist"
+ValidateReplicationFactorOrExit() {
+    REPLICATION_FACTOR=${1}
+    MIN_ISR=${2}
+    if [[ ${REPLICATION_FACTOR} -lt ${MIN_ISR} ]] ; then
+        MyEcho "ERROR" "replication factor must be greater than or equal to min isr"
+        Usage
         exit 1
     fi
 }

@@ -3,59 +3,40 @@
 # Usage
 Usage() {
     echo "Usage: ${PROG_NAME} "
+    echo "  -b|--bootstrap-server: bootstrap server (default: ${DEFAULT_BOOTSTRAP_SERVERS})"
+    echo "  -i|--c3-id: id of the c3 cluster (default: 0)"
+    echo "  -s|--sr-url: SR url (default: ${DEFAULT_SR_URL})"
+    echo "  -c|--connect-url: Connect url (default: ${DEFAULT_CONNECT_URL})"
     echo "  -r|--replication-factor: replication factor (default: 1)"
-    echo "  -H|--health-plus: enable health+ (default: false)"
     echo "  -n|--nohup: run in background (default: false)"
-    echo "  -a|--auth: authn method. Values noauth, plain, scram, gssapi, rbac (default: noauth)"
+    echo "  -a|--authn: authn method. Values noauth, plain, scram, gssapi, rbac (default: noauth)"
     echo "  -h|--help: print help"
 }
 
 # Validate
 Validate() {
-    if [[ ${REPLICATION_FACTOR} -lt ${MIN_ISR} ]] ; then
-        MyEcho "ERROR" "replication factor must be greater than or equal to min isr"
-        Usage
-        exit 1
-    fi
-    case ${AUTHN} in
-        noauth|plain|scram|gssapi|rbac)
-        export AUTHN
-        ;;
-        *)
-        MyEcho "ERROR" "Unknown value ${AUTHN} for option -a or --authn"
-        Usage
-        exit 1
-        ;;
-    esac
+    ValidateNodeIDOrExit "${NODE_ID}"
+    CheckNodeNotRunningOrExit "${NODE_TYPE}" "${NODE_ID}"
+
+    ValidateReplicationFactorOrExit "${REPLICATION_FACTOR}" "${MIN_ISR}"
+    ValidateAuthNMethodOrExit "${AUTHN}"
 }
 
 # Export vars
 ExportVars() {
-    export MY_IP=$(ifconfig en0 | grep inet | awk '$1=="inet" {print $2}')
-
-    CONFLUENT_HTTP_SERVER_LISTENERS=8090
-    export CONFLUENT_HTTP_SERVER_LISTENERS=$(( CONFLUENT_HTTP_SERVER_LISTENERS + 1 ))
-
-    LISTENERS_PORT=9090
-    export LISTENERS_PORT=$(( LISTENERS_PORT + 1 ))
-    if [[ ${AUTHN} -eq "rbac" ]] ; then
-        export EXTERNAL_PORT=$(( LISTENERS_PORT + 100 ))
-        export REPLICATION_PORT=$(( LISTENERS_PORT + 200 ))
-        export TOKEN_PORT=$(( LISTENERS_PORT + 300 ))
-    fi
-
-    export CONTROL_CENTER_OPTS="-D${ENV_NAME} -Dnode=C3"
+    export CONFLUENT_HTTP_SERVER_LISTENERS=8090
+    export LISTENERS_PORT=9021
+    export CONTROL_CENTER_OPTS=$( GetNodePattern )
 
     # CONTROL_CENTER_JMX_OPTS="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.host=${MY_IP} -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
     # CONTROL_CENTER_JMX_OPTS="${CONTROL_CENTER_JMX_OPTS} -Djava.rmi.server.hostname=${MY_IP}"
     # CONTROL_CENTER_JMX_OPTS="${CONTROL_CENTER_JMX_OPTS} -Djava.net.preferIPv4Stack=true"
     # CONTROL_CENTER_JMX_OPTS="${CONTROL_CENTER_JMX_OPTS} -javaagent:${JAR_DIR}/jolokia-jvm-1.6.2-agent.jar=config=${CFG_DIR}/c3_jolokia.properties"
-    # CONTROL_CENTER_JMX_OPTS="${CONTROL_CENTER_JMX_OPTS} -javaagent:${JAR_DIR}/jmx_prometheus_javaagent-0.16.1.jar=${JMX_PORT}:${PROP_DIR}/kafka_streams.yml"
+    # CONTROL_CENTER_JMX_OPTS=${CONTROL_CENTER_JMX_OPTS} -javaagent:${JAR_DIR}/jmx_prometheus_javaagent-0.16.1.jar=${JMX_PORT}:${PROP_DIR}/kafka_streams.yml"
     # export CONTROL_CENTER_JMX_OPTS
     export CONTROL_CENTER_JMX_OPTS="-Djava.net.preferIPv4Stack=true"
-    MyEcho "INFO" "CONTROL_CENTER_JMX_OPTS=${CONTROL_CENTER_JMX_OPTS}"
 
-    export CONTROL_CENTER_LOG4J_OPTS="-Dlog.dir=${LOG_DIR} -Dlog.name=c3.log -Dlog4j.configuration=file://${PROP_DIR}/log4j-rolling.properties"
+    export CONTROL_CENTER_LOG4J_OPTS="-Dconfluent.controlcenter.log.dir=${LOG_DIR}/${NODE_TYPE} -Dlog.dir=${LOG_DIR}/${NODE_TYPE} -Dlog.name=${NODE_TYPE}_${NODE_ID} -Dlog4j.configuration=file://${PROP_DIR}/log4j-rolling.properties"
 }
 
 # Echo vars
@@ -64,28 +45,32 @@ EchoVars() {
     MyEcho "INFO" "####################"
     MyEcho "INFO" "Begin All Vars"
     MyEcho "INFO" "####################"
-    MyEcho "INFO" "PROG_NAME="${PROG_NAME}
-    MyEcho "INFO" "REPLICATION_FACTOR="${REPLICATION_FACTOR}
-    MyEcho "INFO" "CONFLUENT_HTTP_SERVER_LISTENERS="${CONFLUENT_HTTP_SERVER_LISTENERS}
-    MyEcho "INFO" "LISTENERS_PORT="${LISTENERS_PORT}
+    MyEcho "INFO" "PROG_NAME=${PROG_NAME}"
+    MyEcho "INFO" "REPLICATION_FACTOR=${REPLICATION_FACTOR}"
+    MyEcho "INFO" "CONFLUENT_HTTP_SERVER_LISTENERS=${CONFLUENT_HTTP_SERVER_LISTENERS}"
+    MyEcho "INFO" "LISTENERS_PORT=${LISTENERS_PORT}"
     if [[ ${AUTHN} -eq "rbac" ]] ; then
-        MyEcho "INFO" "EXTERNAL_PORT="${EXTERNAL_PORT}
-        MyEcho "INFO" "REPLICATION_PORT="${REPLICATION_PORT}
-        MyEcho "INFO" "TOKEN_PORT="${TOKEN_PORT}
+        MyEcho "INFO" "EXTERNAL_PORT=${EXTERNAL_PORT}"
+        MyEcho "INFO" "REPLICATION_PORT=${REPLICATION_PORT}"
+        MyEcho "INFO" "TOKEN_PORT=${TOKEN_PORT}"
     fi
 
-    MyEcho "INFO" "CONTROL_CENTER_OPTS="${CONTROL_CENTER_OPTS}
-    # MyEcho "INFO" "CONTROL_CENTER_OPTS="${CONTROL_CENTER_JMX_OPTS}
-    MyEcho "INFO" "CONTROL_CENTER_LOG4J_OPTS="${CONTROL_CENTER_LOG4J_OPTS}
+    MyEcho "INFO" "CONTROL_CENTER_OPTS=${CONTROL_CENTER_OPTS}"
+    # MyEcho "INFO" "CONTROL_CENTER_OPTS=${CONTROL_CENTER_JMX_OPTS}
+    MyEcho "INFO" "CONTROL_CENTER_LOG4J_OPTS=${CONTROL_CENTER_LOG4J_OPTS}"
 
-    MyEcho "INFO" "LOG_DIR="${LOG_DIR}
-    MyEcho "INFO" "DATA_DIR="${DATA_DIR}
-    MyEcho "INFO" "CFG_DIR="${CFG_DIR}
-    MyEcho "INFO" "JAR_DIR="${JAR_DIR}
-    MyEcho "INFO" "PROP_DIR="${PROP_DIR}
-    MyEcho "INFO" "HEALTHPLUS_ENABLED="${HEALTHPLUS_ENABLED}
-    MyEcho "INFO" "AUTHN="${AUTHN}
-    MyEcho "INFO" "NOHUP="${NOHUP}
+    MyEcho "INFO" "NODE_TYPE=${NODE_TYPE}"
+    MyEcho "INFO" "NODE_ID=${NODE_ID}"
+    MyEcho "INFO" "CONNECT_URL=${CONNECT_URL}"
+    MyEcho "INFO" "SR_URL=${SR_URL}"
+    MyEcho "INFO" "BOOTSTRAP_SERVERS=${BOOTSTRAP_SERVERS}"
+    MyEcho "INFO" "LOG_DIR=${LOG_DIR}"
+    MyEcho "INFO" "DATA_DIR=${DATA_DIR}"
+    MyEcho "INFO" "CFG_DIR=${CFG_DIR}"
+    MyEcho "INFO" "JAR_DIR=${JAR_DIR}"
+    MyEcho "INFO" "PROP_DIR=${PROP_DIR}"
+    MyEcho "INFO" "AUTHN=${AUTHN}"
+    MyEcho "INFO" "NOHUP=${NOHUP}"
     MyEcho "INFO" "####################"
     MyEcho "INFO" "End All Vars"
     MyEcho "INFO" "####################"
@@ -95,17 +80,27 @@ EchoVars() {
 
 # Generate properties
 GenerateProperties() {
-    RunJ2 ${J2_DIR}/control-center-${AUTHN}.properties.j2 ${CFG_DIR}/control-center.properties
+    RunEnvsubst ${TEMPLATE_DIR}/control-center-${AUTHN}.properties.template ${CFG_DIR}/control-center.properties
 }
 
 # Process args
 ProcessArgs() {
     POSITIONAL_ARGS=()
 
+    export NODE_TYPE=C3
+    export NODE_ID=0
     export REPLICATION_FACTOR=1
     export NOHUP=0
-    export HEALTHPLUS_ENABLED=0
-    export AUTHN=no
+    export AUTHN=noauth
+
+    export DEFAULT_BOOTSTRAP_SERVERS="${MY_IP}:9092"
+    export BOOTSTRAP_SERVERS="${DEFAULT_BOOTSTRAP_SERVERS}"
+
+    export DEFAULT_CONNECT_URL="http://${MY_IP}:8083"
+    export CONNECT_URL="${DEFAULT_CONNECT_URL}"
+
+    export DEFAULT_SR_URL="http://${MY_IP}:8081"
+    export SR_URL="${DEFAULT_SR_URL}"
 
     export PROG_NAME=$0
     if [[ $# -eq 0 ]]; then
@@ -124,13 +119,29 @@ ProcessArgs() {
         shift # past argument
         shift # past value
         ;;
-        -H|--health-plus)
-        export HEALTHPLUS_ENABLED=1
+        -b|--bootstrap-server)
+        export BOOTSTRAP_SERVERS="$2"
         shift # past argument
+        shift # past value
+        ;;
+        -i|--c3-id)
+        export NODE_ID="$2"
+        shift # past argument
+        shift # past value
         ;;
         -n|--nohup)
         export NOHUP=1
         shift # past argument
+        ;;
+        -s|--sr-url)
+        export SR_URL="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -c|--connect-url)
+        export CONNECT_URL="$2"
+        shift # past argument
+        shift # past value
         ;;
         -h|--help)
         MyEcho "INFO" "Printing help"
@@ -162,13 +173,14 @@ main() {
     EchoVars
     GenerateProperties
     MyEcho "INFO" "Starting C3  ${CFG_DIR}/control-center.properties ..."
+    MyEcho "INFO" "${CONFLUENT_HOME}/bin/control-center-start ${CFG_DIR}/control-center.properties"
     if [[ ${NOHUP} -eq 1 ]] ; then
-        MyEcho "INFO" "nohup ${CONFLUENT_HOME}/bin/control-center-start ${CFG_DIR}/control-center.properties 2>&1 > ${LOG_DIR}/c3.log &"
-        nohup ${CONFLUENT_HOME}/bin/control-center-start ${CFG_DIR}/control-center.properties 2>&1 > ${LOG_DIR}/c3.log &
+        nohup ${CONFLUENT_HOME}/bin/control-center-start ${CFG_DIR}/control-center.properties 2>&1 > ${LOG_DIR}/${NODE_TYPE}_${NODE_ID}.log &
     else
-        MyEcho "INFO" "${CONFLUENT_HOME}/bin/control-center-start ${CFG_DIR}/control-center.properties"
         ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${BROKER_ID}.properties
     fi
+
+    echo "${NODE_TYPE}_${NODE_ID}=http://${MY_IP}:${LISTENERS_PORT}" >> ${STATE_FILE}
 }
 
 ######################################################################

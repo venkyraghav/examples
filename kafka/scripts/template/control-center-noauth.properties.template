@@ -1,0 +1,45 @@
+# A comma separated list of Apache Kafka cluster host names (required)
+bootstrap.servers=${BOOTSTRAP_SERVERS}
+
+confluent.controlcenter.streams.security.protocol=PLAINTEXT
+confluent.controlcenter.kafka.mycluster.bootstrap.servers=${BOOTSTRAP_SERVERS}
+confluent.controlcenter.kafka.mycluster.security.protocol=PLAINTEXT
+
+# Unique identifier for the Control Center
+confluent.controlcenter.id=${C3_ID}
+
+# Directory for Control Center to store data
+confluent.controlcenter.data.dir=${DATA_DIR}/c3-${C3_ID}
+
+confluent.controlcenter.rest.listeners=http://${MY_IP}:${LISTENERS_PORT}
+
+confluent.controlcenter.connect.connect-0.cluster=${CONNECT_URL}
+
+confluent.controlcenter.schema.registry.url=${SR_URL}
+
+# Kafka REST endpoint URL
+confluent.controlcenter.streams.cprest.url=http://${MY_IP}:8090
+
+# Replication for internal Control Center topics.
+confluent.controlcenter.internal.topics.replication=${REPLICATION_FACTOR}
+
+# Topic used to store Control Center configuration
+confluent.controlcenter.command.topic.replication=${REPLICATION_FACTOR}
+
+# Enable automatic UI updates
+confluent.controlcenter.ui.autoupdate.enable=true
+
+# Enable usage data collection
+confluent.controlcenter.usage.data.collection.enable=true
+
+# Enable Controller Chart in Broker page
+#confluent.controlcenter.ui.controller.chart.enable=true
+
+confluent.metrics.reporter.topic.replicas=${REPLICATION_FACTOR}
+metric.reporters=io.confluent.metrics.reporter.ConfluentMetricsReporter
+confluent.metrics.reporter.bootstrap.servers=${BOOTSTRAP_SERVERS}
+
+confluent.monitoring.interceptor.topic.replication=${REPLICATION_FACTOR}
+confluent.metrics.topic.replication=${REPLICATION_FACTOR}
+confluent.controlcenter.internal.topics.replication=${REPLICATION_FACTOR}
+confluent.controlcenter.command.topic.replication=${REPLICATION_FACTOR}

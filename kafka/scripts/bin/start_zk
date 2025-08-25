@@ -1,20 +1,20 @@
 #!/bin/bash
 
 ExportVars() {
-    export MY_IP=$(ifconfig en0 | grep inet | awk '$1=="inet" {print $2}')
     export DATA_DIR
-    export kafka.logs.dir=${LOG_DIR}/zk
+    # export kafka.logs.dir="${LOG_DIR}/zk"
     export KAFKA_LOG4J_OPTS="-Dkafka.logs.dir=${LOG_DIR}/zk -Dlog4j.configuration=file://${PROP_DIR}/log4j_zk.properties"
     export JMX_PORT=8080
     export JOLOKIA_PORT=7770
+    export NODE_ID="0"
 
-    export KAFKA_OPTS="-D${ENV_NAME} -Dnode=ZK"
+    export KAFKA_OPTS=$( GetNodePattern )
 
     KAFKA_JMX_OPTS="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.host=${MY_IP} -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
     KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS} -Djava.rmi.server.hostname=${MY_IP}"
     KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS} -Djava.net.preferIPv4Stack=true"
-    KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS} -javaagent:${JOLOKIA_JAR}=config=${CFG_DIR}/zk_jolokia.properties"
-    KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS} -javaagent:${JMX_PROM_JAR}=${JMX_PORT}:${PROP_DIR}/zookeeper.yml"
+    KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS} -javaagent:${JAR_DIR}/jolokia-jvm-1.6.2-agent.jar=config=${CFG_DIR}/zk_jolokia.properties"
+    KAFKA_JMX_OPTS="${KAFKA_JMX_OPTS} -javaagent:${JAR_DIR}/jmx_prometheus_javaagent-0.16.1.jar=${JMX_PORT}:${PROP_DIR}/zookeeper.yml"
     export KAFKA_JMX_OPTS
 }
 
@@ -22,6 +22,7 @@ ProcessArgs() {
     POSITIONAL_ARGS=()
     export NOHUP=0
     export PROG_NAME=$0
+    export NODE_TYPE="ZK"
     if [[ $# -eq 0 ]]; then
         return
     fi
@@ -53,18 +54,24 @@ ProcessArgs() {
 }
 
 Validate() {
-    echo ""
+    CheckProcessNotRunningOrExit "${NODE_TYPE}"
 }
 
 EchoVars() {
     MyEcho "INFO" "KAFKA_LOG4J_OPTS=${KAFKA_LOG4J_OPTS}"
     MyEcho "INFO" "KAFKA_OPTS=${KAFKA_OPTS}"
-    MyEcho "INFO" "NOHUP=${NOHUP}"
+    MyEcho "INFO" "KAFKA_JMX_OPTS=${KAFKA_JMX_OPTS}"
+    MyEcho "INFO" "MY_IP=${MY_IP}"
+    MyEcho "INFO" "JOLOKIA_PORT=${JOLOKIA_PORT}"
+    MyEcho "INFO" "JMX_PORT=${JMX_PORT}"
+    MyEcho "INFO" "DATA_DIR=${DATA_DIR}"
 }
 
 GenerateProperties() {
-    RunJ2 ${J2_DIR}/zookeeper.properties.j2 ${CFG_DIR}/zookeeper.properties
-    RunJ2 ${J2_DIR}/jolokia.properties.j2 ${CFG_DIR}/zk_jolokia.properties
+    # RunJ2 ${J2_DIR}/zookeeper.properties.j2 ${CFG_DIR}/zookeeper.properties
+    # RunJ2 ${J2_DIR}/jolokia.properties.j2 ${CFG_DIR}/zk_jolokia.properties
+    RunEnvsubst ${TEMPLATE_DIR}/zookeeper.properties.template ${CFG_DIR}/zookeeper.properties
+    RunEnvsubst ${TEMPLATE_DIR}/jolokia.properties.template ${CFG_DIR}/zk_jolokia.properties
 }
 
 main() {
@@ -76,14 +83,15 @@ main() {
     EchoVars
     GenerateProperties
 
-    MyEcho "INFO" "Starting Zookeeper with ${CFG_DIR}/zookeeper.properties ..."
-    if [[ ${NOHUP} -eq 0 ]] ; then
-        MyEcho "INFO" "${CONFLUENT_HOME}/bin/zookeeper-server-start ${CFG_DIR}/zookeeper.properties ..."
-        ${CONFLUENT_HOME}/bin/zookeeper-server-start ${CFG_DIR}/zookeeper.properties
+    MyEcho "INFO" "Starting Zookeeper ..."
+    MyEcho "INFO" "${CONFLUENT_HOME}/bin/zookeeper-server-start ${CFG_DIR}/zookeeper.properties ..."
+    if [[ ${NOHUP} -eq 1 ]] ; then
+        nohup ${CONFLUENT_HOME}/bin/zookeeper-server-start ${CFG_DIR}/zookeeper.properties 2>&1 > ${LOG_DIR}/zk_${NODE_ID}.log &
     else
-        MyEcho "INFO" "nohup ${CONFLUENT_HOME}/bin/zookeeper-server-start ${CFG_DIR}/zookeeper.properties 2>&1 > ${LOG_DIR}/zk_nohup.log & ..."
-        nohup ${CONFLUENT_HOME}/bin/zookeeper-server-start ${CFG_DIR}/zookeeper.properties 2>&1 > ${LOG_DIR}/zk_nohup.log &
+        ${CONFLUENT_HOME}/bin/zookeeper-server-start ${CFG_DIR}/zookeeper.properties
     fi
+
+    echo "ZK=${MY_IP}:2181" > ${STATE_FILE}
 }
 
 ######################################################################
