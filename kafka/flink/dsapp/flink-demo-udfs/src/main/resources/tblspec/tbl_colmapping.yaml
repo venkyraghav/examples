@@ -1,0 +1,15 @@
+- name: tbl_1
+  values:
+    - gf1
+    - gf2
+    - gf_tbl
+    - tbl_1_f1
+    - tbl_1_f2
+    - tbl_1_f3
+- name: tbl_2
+  values:
+    - gf1
+    - gf2
+    - gf_tbl
+    - tbl_2_f1
+    - tbl_2_f2

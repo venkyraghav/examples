@@ -1,0 +1,36 @@
+syntax = "proto3";
+package io.confluent.example.proto;
+
+message ExemptionT {
+  string exemptionId = 1;
+  string certificateNumber = 2;
+  string jurisdictionId = 3;
+  string entityUseCode = 4;
+  string businessPartyId = 5;
+  bool applyToSubTJ = 6;
+  string effectiveDate = 7;
+  string expirationDate = 8;
+  string onSkuDependencyType = 9;
+  repeated string skus = 10;
+}
+
+message EntityT {
+  string ouId = 1;
+  int32 entityUseId = 2;
+}
+
+message ConfigurationDetailsT {
+  oneof content {
+    ExemptionT exemption = 1;
+    EntityT entity = 2;
+  }
+}
+
+message ConfigurationT {
+  string eventId = 1;
+  int64 timestamp = 2;
+  string configurationType = 3;
+  string operationType = 4;
+  string organizationId = 5;
+  repeated ConfigurationDetailsT ConfigurationDetails = 6;
+}

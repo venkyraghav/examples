@@ -1,0 +1,83 @@
+[
+  {
+    "type": "record",
+    "namespace": "flinkdemo",
+    "name": "orders",
+    "doc": "orders",
+    "fields": [
+      {
+        "name": "order_id",
+        "type":{
+          "type":"int",
+          "arg.properties": {
+            "range": {"min": 1, "max": 10000}
+          }
+        },
+        "doc": "order id"
+      },
+      {
+        "name": "product_id",
+        "type": {
+          "type": "int",
+          "arg.properties": {
+            "range": {"min": 1, "max": 20}
+          }
+        },
+        "doc": "product id"
+      },
+      {
+        "name": "customer_id",
+        "type": {
+          "type": "string",
+          "arg.properties": {
+            "options": [
+              "user_00", "user_01", "user_02", "user_03", "user_04", "user_05", "user_06", "user_07", "user_08", "user_09",
+              "user_10", "user_11", "user_12", "user_13", "user_14", "user_15", "user_16", "user_17", "user_18", "user_19"
+            ]
+          }
+        },
+        "doc": "customer ids"
+      }
+    ]
+  },
+  {
+    "type": "record",
+    "namespace": "flinkdemo",
+    "name": "shipments",
+    "doc": "shipments",
+    "fields": [
+      {
+        "name": "order_id",
+        "type":{
+          "type":"int",
+          "arg.properties": {
+            "range": {"min": 1, "max": 10000}
+          }
+        },
+        "doc": "order id"
+      },
+      {
+        "name": "shipment_id",
+        "type": {
+          "type": "int",
+          "arg.properties": {
+            "range": {"min": 1, "max": 50000}
+          }
+        },
+        "doc": "shipment id"
+      },
+      {
+        "name": "status",
+        "type": {
+          "type": "string",
+          "arg.properties": {
+            "options": [
+              "handling", "packed", "awaiting_pickup", "shipped", "intransit", "delivered"
+            ]
+          }
+        },
+        "doc": "status"
+      }
+    ]
+  }
+]

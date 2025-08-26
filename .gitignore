@@ -14,11 +14,14 @@
 **/.idea
 **/.gradle
 **/.settings
+**/.project
 **/*.iml
 **/build
 **/gradle
 **/pkg
-
+**/*.tfstate
+**/*.tfstate.backup
+**/pssession/*
 # Package Files #
 **/*.jar
 **/*.war
@@ -47,3 +50,8 @@ hs_err_pid*
 **/.terraform/**
 **/.terraform.lock.hcl
 **/terraform.tfstate.d/**
+**/dependency-reduced-pom.xml
+**/gradlew
+**/gradlew.bat
+**/*.bak
+

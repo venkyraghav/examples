@@ -1,0 +1,17 @@
+apiVersion: platform.confluent.io/v1beta1
+kind: FlinkEnvironment
+metadata:
+  name: flink-env1
+  namespace: flink
+spec:
+  kubernetesNamespace: flink
+  flinkApplicationDefaults:
+    spec:
+      flinkConfiguration:
+        taskmanager.numberOfTaskSlots: 2
+        metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+        metrics.reporter.prom.port: 9249-9250
+        rest.profiling.enabled: true
+  cmfRestClassRef:
+    name: default
+    namespace: cpf

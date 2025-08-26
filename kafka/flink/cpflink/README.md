@@ -135,6 +135,7 @@ kubectl get pod -n confluent --watch
 |8079|CMF|(while true; do kubectl port-forward svc/cmf-service 8079:80 -n confluent; done;) &|
 |8080|Keycloak|(while true; do kubectl port-forward svc/keycloak 8080:8080 -n confluent; done;) &|
 |8081|Flink App|(while true; do kubectl port-forward svc/flink-app1-rest 8081:8081 -n confluent; done;) &|
+|9073|Kafka|(while true; do kubectl port-forward svc/kafka 9073:9073 -n confluent; done;) &|
 
 * Install keycloak
 
@@ -301,7 +302,8 @@ confluent flink application web-ui-forward basic-example --environment env1 --po
 
 ### Setup monitoring
 
-TODO
+* Prometheus metrics scrapper url is `http://{flinkappname}.{namespace}.svc.cluster.local:9249` as confiured in `FlinkEnnvironment` or `FlinkApplication`
+  * example curl http://flink-app1.confluent.svc.cluster.local:9249
 
 ## Troubleshooting
 
@@ -313,3 +315,10 @@ TODO
 * Enable CMF debug
   * --set cmf.logging.level.root=debug
 * Check for AuthZ errors in CP Kafka pods
+* Bad certificate while using `confluent flink`
+
+```shell
+confluent flink environment create jaggi_env --url https://cmf-service.operator.svc.cluster.local:8080 --kubernetes-namespace operator --client-key-path server-key.pem --client-cert-path server.pem  --certificate-authority-path ca.pem
+
+Error: failed to create environment "jaggi_env": Post "https://cmf-service.operator.svc.cluster.local:8080/cmf/api/v1/environments": remote error: tls: bad certificate
+```

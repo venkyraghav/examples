@@ -1,0 +1,38 @@
+apiVersion: platform.confluent.io/v1beta1
+kind: FlinkApplication
+metadata:
+  name: flink-app1
+  namespace: flink
+spec:
+  flinkEnvironment: flink-env1
+  image: confluentinc/cp-flink:1.19.1-cp1
+  flinkVersion: v1_19
+  serviceAccount: flink
+  jobManager:
+    resource:
+      memory: 1048m
+      cpu: 1
+    podTemplate:
+      spec:
+        initContainers:
+          - name: init-container
+            image: minio/mc  # Uses MinIO Client image
+            command: ["/bin/sh", "-c"]
+            args:
+              - |
+                mc alias set myminio http://minio-service:9000;
+                mc cp dev-minio/flink/kafka-reader-writer-1.0-SNAPSHOT.jar /opt/flink/flink-examples-streaming.jar;
+
+  taskManager:
+    resource:
+      memory: 1048m
+      cpu: 1
+  job:
+    jarURI: local:///opt/flink/flink-examples-streaming.jar
+    args: ["--brokers", "kafka.confluent.svc.cluster.local:9092", "--in-topic", "in", "--out-topic", "out", "--parallelism", "1"]
+    state: running
+    parallelism: 3
+    upgradeMode: stateless
+  cmfRestClassRef:
+    name: default
+    namespace: cpf

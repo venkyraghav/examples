@@ -1,0 +1,6 @@
+#!/bin/bash
+http DELETE http://localhost:8080/cmf/api/v1/environments/development/applications/flink-ds-learn
+mvn clean package
+mc cp target/flink-datastream-learn-0.0.1-SNAPSHOT.jar dev-minio/flink/
+mc cp ~/_official/cp/config/flink_job/dslearn_03kafkacopy_commandconfig.properties dev-minio/flink/command_config.properties
+http POST localhost:8080/cmf/api/v1/environments/development/applications < kafka-deployment.json

@@ -2,6 +2,7 @@
   "CN": "*.my.domain",
   "hosts": [
     "confluent-manager-for-apache-flink.confluent.svc.cluster.local",
+    "cmf-service.confluent.svc.cluster.local",
     "keycloak.confluent.svc.cluster.local",
     "*.my.domain",
     "*.confluent.svc.cluster.local",

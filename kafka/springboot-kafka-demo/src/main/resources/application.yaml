@@ -1,0 +1,48 @@
+spring:
+  jmx:
+    enabled: true
+  application.name: demo
+  kafka:
+    bootstrap-servers: <REPLACE_ME>
+    properties:
+      client.id: ccloud-springboot-client-f3d57c89-7688-44d2-8cc6-40fbca7f9997
+      security:
+        protocol: SASL_SSL
+      sasl:
+        jaas:
+          config: org.apache.kafka.common.security.plain.PlainLoginModule required username='<REPLACE_ME>' password='<REPLACE_ME>';
+        mechanism: PLAIN
+    producer:
+      transaction-id-prefix: my-tx-producer-
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializer
+      # value-serializer: io.confluent.kafka.serializers.protobuf.KafkaProtobufSerializer
+      properties:
+        #transactional.id: my-tx-producer
+        acks: all
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 1
+        batch.size: 100000
+        linger.ms: 100
+        compression.type: lz4
+        schema.registry.url: <REPLACE_ME>
+        schema.registry.basic.auth.credentials.source: USER_INFO
+        schema.registry.basic.auth.user.info: <REPLACE_ME>:<REPLACE_ME> # SR_APIKEY:SR_SECRET
+        specific.json.reader: true
+    consumer:
+      transaction-id-prefix: my-tx-producer-
+      group-id: group_id-2
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: io.confluent.kafka.serializers.json.KafkaJsonSchemaDeserializer
+      # value-deserializer: io.confluent.kafka.serializers.protobuf.KafkaProtobufDeserializer
+      properties:
+        isolation.level: read_committed
+        fetch.min.bytes: 100000
+        fetch.max.wait.ms: 1000
+        schema.registry.url: <REPLACE_ME>
+        schema.registry.basic.auth.credentials.source: USER_INFO
+        schema.registry.basic.auth.user.info: <REPLACE_ME>:<REPLACE_ME> # SR_APIKEY:SR_SECRET
+        specific.json.reader: true
