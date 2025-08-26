@@ -54,7 +54,7 @@ keytool -import -v -trustcacerts -keystore ./generated/jks/truststore.jks -store
 # Watch for SAN Names
 keytool -v -list -keystore ./generated/jks/truststore.jks
 
-keytool -v -list -keystore ./generated/jks/keystorestore.jks
+keytool -v -list -keystore ./generated/jks/keystore.jks
 
 ```
 
@@ -312,6 +312,8 @@ TODO
 * FKO Running
 * Check confluentrolebindings
   * https://confluentinc.atlassian.net/wiki/spaces/OAAC/pages/3539305670/RFC+16.3+-+CP-Flink+RBAC+Summary+and+E2E+user-flow
+* Enable CMF debug
+  * --set cmf.logging.level.root=debug
 * Check for AuthZ errors in CP Kafka pods
 * Bad certificate while using `confluent flink`
 
