@@ -1,0 +1,61 @@
+config:
+  name2: DB13A_raw
+  tables:
+    - name: hm_cba_ci
+      columns:
+        - name: cba_ci_userid
+          type: string
+        - name: cba_ci_name
+          type: string
+        - name: cba_ci_createdon
+          type: date
+        - name: cba_ci_modifiedon
+          type: time
+    - name: hm_cba_ci_xref
+      columns:
+        - name: cba_ci_xref_userid
+          type: string
+        - name: cba_ci_xref_f2
+          type: int
+          default: 1
+        - name: cba_ci_xref_f3
+          type: string
+          default: "A"
+    - name: hm_cba_ci_adr_raw
+      columns:
+        - name: cba_ci_adr_userid
+          type: string
+        - name: cba_ci_adr_line
+          type: string
+        - name: cba_ci_adr_city
+          type: string
+        - name: cba_ci_adr_state
+          type: string
+        - name: cba_ci_adr_newcol
+          type: time
+  joins:
+    - name: join1
+      conditions:
+        - lhs:
+            name: hm_cba_ci_xref
+            alias: j1lhs
+            column: cba_ci_xref_userid
+          rhs:
+            name: hm_cba_ci_adr_raw
+            alias: j1rhs
+            column: cba_ci_adr_userid
+      destination:
+        name: hm_cba_ci_adr_fgac
+        columns:
+          - name: cba_ci_adr_userid
+            column: j1rhs.cba_ci_adr_userid
+          - name: cba_ci_adr_line
+            column: j1rhs.cba_ci_adr_line
+          - name: cba_ci_adr_city
+            column: j1rhs.cba_ci_adr_city
+          - name: cba_ci_adr_state
+            column: j1rhs.cba_ci_adr_state
+          - name: cba_ci_xref_f2
+            column: j1rhs.cba_ci_xref_f2
+          - name: cba_ci_xref_f3
+            column: j1rhs.cba_ci_xref_f3
