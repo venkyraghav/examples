@@ -300,7 +300,10 @@ CreateCerts() {
 
     MyEcho "INFO" "Use existing certs (if exists)..."
     if [[ ! -f ${ROOTCA_KEY} ]]; then
+        MyEcho "INFO" "Generating ${ROOTCA_KEY}"
         openssl genrsa -out ${ROOTCA_KEY} 4096
+
+        MyEcho "INFO" "Generating ${ROOTCA_PEM}"
         openssl req -x509 -new -nodes -key ${ROOTCA_KEY} \
             -sha256 -days 3650 \
             -out ${ROOTCA_PEM} \
@@ -310,13 +313,16 @@ CreateCerts() {
     fi
 
     if [[ ! -f ${SERVER_KEY} ]]; then
+        MyEcho "INFO" "Generating ${SERVER_KEY}"
         openssl genrsa -out ${SERVER_KEY} 2048
 
+        MyEcho "INFO" "Generating ${SERVER_CSR}"
         openssl req -new \
             -key ${SERVER_KEY} \
             -out ${SERVER_CSR} \
             -subj "/C=US/ST=GA/L=Atlanta/O=${OU}/CN=${SAN_DNS}"
 
+        MyEcho "INFO" "Generating ${SERVER_CRT}"
         openssl x509 -req \
             -in ${SERVER_CSR} \
             -CA ${ROOTCA_PEM} \
@@ -324,8 +330,10 @@ CreateCerts() {
             -out ${SERVER_CRT} -days 3650 -sha256 \
             -extfile ${SAN_CFG_FILE} -extensions v3_req
 
+        MyEcho "INFO" "Listing ${SERVER_CRT}"
         openssl x509 -in ${SERVER_CRT} -text -noout | grep -A 1 "Subject Alternative Name"
 
+        MyEcho "INFO" "Generating ${SERVER_P12}"
         openssl pkcs12 -export \
             -in ${SERVER_CRT} \
             -inkey ${SERVER_KEY} \
@@ -334,6 +342,7 @@ CreateCerts() {
             -name "${SERVER_ALIAS}" \
             -password pass:${PASSWORD}
 
+        MyEcho "INFO" "Generating ${SERVER_JKS}"
         keytool -importkeystore \
             -srckeystore ${SERVER_P12} \
             -srcstoretype PKCS12 \
@@ -342,12 +351,15 @@ CreateCerts() {
             -deststoretype JKS \
             -deststorepass ${PASSWORD} \
             -alias ${SERVER_ALIAS}
+
+        MyEcho "INFO" "Listing ${SERVER_JKS}"
         keytool -list -v -keystore ${SERVER_JKS} -storepass ${PASSWORD}
     else
         MyEcho "INFO" "Using existing ${SERVER_KEY}"
     fi
 
     if [[ ! -f ${TRUST_JKS} ]]; then
+        MyEcho "INFO" "Generating ${TRUST_JKS}"
         keytool -importcert \
             -trustcacerts \
             -file ${ROOTCA_PEM} \
@@ -355,6 +367,8 @@ CreateCerts() {
             -keystore ${TRUST_JKS} \
             -storepass ${PASSWORD} \
             -noprompt
+
+        MyEcho "INFO" "Listing ${TRUST_JKS}"
         keytool -list -v -keystore ${TRUST_JKS} -storepass ${PASSWORD}
     else
         MyEcho "INFO" "Using existing ${TRUST_JKS}"
