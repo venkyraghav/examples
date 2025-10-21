@@ -2,18 +2,25 @@
 
 # Usage
 Usage() {
-    echo "Usage: ${PROG_NAME} "
-    echo "  -b|--broker-id: broker id (default: 0)"
-    echo "  -d|--dc-id: data center id (default: 1)"
-    echo "  -r|--replication-factor: replication factor (default: 1)"
-    echo "  -m|--min-isr: min isr (default: 1)"
-    echo "  -n|--nohup: run in background (default: false)"
-    echo "  -a|--authn: authn method. Values noauth, plain, scram, gssapi, rbac (default: noauth)"
+    echo "Usage: ${PROG_NAME}"
+    echo "  -f|--fresh: create fresh cluster (default: ${DEFAULT_FRESH})"
+    echo "  -C|--cluster-id: cluster-id to use or ${DEFAULT_CLUSTER_ID} for fresh cluster (default: ${DEFAULT_CLUSTER_ID})"
+    echo "  -D|--dry-run: perform dry run (default: ${DEFAULT_DRY_RUN})"
+    echo "  -b|--broker-id: broker id (default: ${DEFAULT_NODE_ID})"
+    echo "  -d|--dc-id: data center id (default: ${DEFAULT_DC_ID})"
+    echo "  -k|--kraft-mode. Values none, controller, kraftbroker (default: ${DEFAULT_KRAFT_MODE})"
+    echo "  -c|--controller-quorum (default: ${DEFAULT_CONTROLLER_QUORUM})"
+    echo "  -r|--replication-factor: replication factor (default: ${DEFAULT_REPLICATION_FACTOR})"
+    echo "  -m|--min-isr: min isr (default: ${DEFAULT_MIN_ISR})"
+    echo "  -n|--nohup: run in background (default: ${DEFAULT_NOHUP})"
+    echo "  -a|--authn: authn method. Values noauth, plain, scram, gssapi, rbac (default: ${DEFAULT_AUTHN})"
     echo "  -h|--help: print help"
 }
 
 # Validate
 Validate() {
+    ValidateKraftMode "${KRAFT_MODE}"
+
     ValidateNodeIDOrExit "${NODE_ID}"
     CheckNodeNotRunningOrExit "${NODE_TYPE}" "${NODE_ID}"
 
@@ -24,25 +31,40 @@ Validate() {
 # Export vars
 ExportVars() {
     export ZK_PORT=2181
-    CONFLUENT_HTTP_SERVER_LISTENERS=8090
+
+    case ${KRAFT_MODE} in
+        none|kraftbroker)
+        LISTENERS_PORT=9091
+        CONFLUENT_HTTP_SERVER_LISTENERS=8091
+        JMX_PORT=18081
+        JOLOKIA_PORT=17771
+        ;;
+        controller)
+        LISTENERS_PORT=9051
+        CONFLUENT_HTTP_SERVER_LISTENERS=8051
+        JMX_PORT=18051
+        JOLOKIA_PORT=17751
+        ;;
+        *)
+        MyEcho "ERROR" "Unknown value ${KRAFT_MODE} for option -k or --kraft-mode"
+        Usage
+        exit 1
+        ;;
+    esac
+
     export CONFLUENT_HTTP_SERVER_LISTENERS=$(( CONFLUENT_HTTP_SERVER_LISTENERS + NODE_ID ))
-
-    JMX_PORT=18080
     export JMX_PORT=$(( JMX_PORT + NODE_ID ))
-
-    JOLOKIA_PORT=17770
     export JOLOKIA_PORT=$(( JOLOKIA_PORT + NODE_ID ))
 
     ########################################################################################################
     # NODE_ID | LISTENERS_PORT | EXTERNAL_PORT | REPLICATION_PORT | TOKEN_PORT | JOLOKIA_PORT | JMX_PORT
     ########################################################################################################
-    # 1         | 9091           | 9191          | 9291             | 9391       | 17771        | 18081
-    # 2         | 9092           | 9192          | 9292             | 9392       | 17772        | 18082
-    # 3         | 9093           | 9193          | 9293             | 9393       | 17773        | 18083
+    # 1         | 9091/9051           | 9191          | 9291             | 9391       | 17771        | 18081
+    # 2         | 9092/9052           | 9192          | 9292             | 9392       | 17772        | 18082
+    # 3         | 9093/9053           | 9193          | 9293             | 9393       | 17773        | 18083
 
-    LISTENERS_PORT=9090
     export LISTENERS_PORT=$(( LISTENERS_PORT + NODE_ID ))
-    if [[ ${AUTHN} -eq "rbac" ]] ; then
+    if [[ "${AUTHN}" == "rbac" ]] ; then
         export EXTERNAL_PORT=$(( LISTENERS_PORT + 100 ))
         export REPLICATION_PORT=$(( LISTENERS_PORT + 200 ))
         export TOKEN_PORT=$(( LISTENERS_PORT + 300 ))
@@ -71,6 +93,12 @@ EchoVars() {
     MyEcho "INFO" "DC_ID=${DC_ID}"
     MyEcho "INFO" "NODE_TYPE=${NODE_TYPE}"
     MyEcho "INFO" "NODE_ID=${NODE_ID}"
+    MyEcho "INFO" "FRESH=${FRESH}"
+    MyEcho "INFO" "CLUSTER_ID=${CLUSTER_ID}"
+    MyEcho "INFO" "DRY_RUN=${DRY_RUN}"
+    MyEcho "INFO" "KRAFT_MODE=${KRAFT_MODE}"
+    MyEcho "INFO" "CONTROLLER_QUORUM=${CONTROLLER_QUORUM}"
+    MyEcho "INFO" "CONTROLLER_QUORUM_BOOTSTRAP=${CONTROLLER_QUORUM_BOOTSTRAP}"
     MyEcho "INFO" "REPLICATION_FACTOR=${REPLICATION_FACTOR}"
     MyEcho "INFO" "MIN_ISR=${MIN_ISR}"
 
@@ -79,14 +107,14 @@ EchoVars() {
     MyEcho "INFO" "JOLOKIA_PORT=${JOLOKIA_PORT}"
     MyEcho "INFO" "JMX_PORT=${JMX_PORT}"
     MyEcho "INFO" "LISTENERS_PORT=${LISTENERS_PORT}"
-    if [[ ${AUTHN} -eq "rbac" ]] ; then
+    if [[ "${AUTHN}" == "rbac" ]] ; then
         MyEcho "INFO" "EXTERNAL_PORT=${EXTERNAL_PORT}"
         MyEcho "INFO" "REPLICATION_PORT=${REPLICATION_PORT}"
         MyEcho "INFO" "TOKEN_PORT=${TOKEN_PORT}"
     fi
 
     MyEcho "INFO" "KAFKA_OPTS=${KAFKA_OPTS}"
-    # MyEcho "INFO" "KAFKA_JMX_OPTS=${KAFKA_JMX_OPTS}"
+    MyEcho "INFO" "KAFKA_JMX_OPTS=${KAFKA_JMX_OPTS}"
     MyEcho "INFO" "KAFKA_LOG4J_OPTS=${KAFKA_LOG4J_OPTS}"
 
     MyEcho "INFO" "LOG_DIR=${LOG_DIR}"
@@ -103,27 +131,98 @@ EchoVars() {
     echo ""
 }
 
+InitNode() {
+    if [[ "${FRESH}" -eq "0" ]] ; then
+        return
+    fi
+    if [[ ${DRY_RUN} -eq "1" ]] ; then
+        MyEcho "INFO" "InitNode DryRun for ${KRAFT_MODE}"
+        return
+    fi
+    case ${KRAFT_MODE} in
+        controller)
+        ${CONFLUENT_HOME}/bin/kafka-storage format -t ${CLUSTER_ID}  -c ${PROP_FILE} --no-initial-controllers
+        ;;
+        kraftbroker)
+        ${CONFLUENT_HOME}/bin/kafka-storage format -t ${CLUSTER_ID} -c ${PROP_FILE}
+        ;;
+        *)
+        MyEcho "ERROR" "Unknown value ${KRAFT_MODE} for option -k or --kraft-mode"
+        Usage
+        exit 1
+        ;;
+    esac
+}
+
 # Generate properties
 GenerateProperties() {
-    # RunJ2 ${J2_DIR}/server-${AUTHN}.properties.j2 ${CFG_DIR}/server_${NODE_ID}.properties
-    # RunJ2 ${J2_DIR}/jolokia.properties.j2 ${CFG_DIR}/kafka_jolokia_${NODE_ID}.properties
-    # RunJ2 ${J2_DIR}/log4j.properties.j2 ${CFG_DIR}/log4j_${NODE_ID}.properties
-    RunEnvsubst ${TEMPLATE_DIR}/server-${AUTHN}.properties.template ${CFG_DIR}/server_${NODE_ID}.properties
-    RunEnvsubst ${TEMPLATE_DIR}/jolokia.properties.template ${CFG_DIR}/kafka_jolokia_${NODE_ID}.properties
-    RunEnvsubst ${TEMPLATE_DIR}/log4j.properties.template ${CFG_DIR}/log4j_${NODE_ID}.properties
+    case ${KRAFT_MODE} in
+        none)
+        PROP_TMPL=server-${AUTHN}.properties.template
+        PROP_FILE=${CFG_DIR}/server_${NODE_ID}.properties
+        ;;
+        kraftbroker)
+        PROP_TMPL=broker-kraft-${AUTHN}.properties.template
+        PROP_FILE=${CFG_DIR}/broker-kraft_${NODE_ID}.properties
+        ;;
+        controller)
+        PROP_TMPL=controller-${AUTHN}.properties.template
+        PROP_FILE=${CFG_DIR}/controller_${NODE_ID}.properties
+        ;;
+        *)
+        MyEcho "ERROR" "Unknown value ${KRAFT_MODE} for option -k or --kraft-mode"
+        Usage
+        exit 1
+        ;;
+    esac
+    export PROP_FILE
+
+    if [[ "${FRESH}" -eq "1" ]] ; then
+        RunEnvsubst ${TEMPLATE_DIR}/${PROP_TMPL} ${PROP_FILE}
+        RunEnvsubst ${TEMPLATE_DIR}/jolokia.properties.template ${CFG_DIR}/kafka_jolokia_${NODE_ID}.properties
+        RunEnvsubst ${TEMPLATE_DIR}/log4j.properties.template ${CFG_DIR}/log4j_${NODE_ID}.properties
+        InitNode
+    fi
 }
 
 # Process args
 ProcessArgs() {
     POSITIONAL_ARGS=()
 
-    export DC_ID=1
     export NODE_TYPE="AK"
-    export NODE_ID=0
-    export REPLICATION_FACTOR=1
-    export MIN_ISR=1
-    export NOHUP=0
-    export AUTHN=noauth
+
+    export DEFAULT_CLUSTER_ID=0
+    export CLUSTER_ID=${DEFAULT_CLUSTER_ID}
+
+    export DEFAULT_DRY_RUN=0
+    export DRY_RUN=${DEFAULT_DRY_RUN}
+
+    export DEFAULT_FRESH=0
+    export FRESH=${DEFAULT_FRESH}
+
+    export DEFAULT_DC_ID=1
+    export DC_ID=${DEFAULT_DC_ID}
+
+    export DEFAULT_NODE_ID=0
+    export NODE_ID=${DEFAULT_NODE_ID}
+
+    export DEFAULT_REPLICATION_FACTOR=1
+    export REPLICATION_FACTOR=${DEFAULT_REPLICATION_FACTOR}
+
+    export DEFAULT_MIN_ISR=1
+    export MIN_ISR=${DEFAULT_MIN_ISR}
+
+    export DEFAULT_NOHUP=0
+    export NOHUP=${DEFAULT_NOHUP}
+
+    export DEFAULT_AUTHN=noauth
+    export AUTHN=${DEFAULT_AUTHN}
+
+    export DEFAULT_KRAFT_MODE=kraftbroker
+    export KRAFT_MODE=${DEFAULT_KRAFT_MODE}
+
+    export DEFAULT_CONTROLLER_QUORUM="0@${MY_IP}:9051"
+    export CONTROLLER_QUORUM=${DEFAULT_CONTROLLER_QUORUM}
 
     export PROG_NAME=$0
     if [[ $# -eq 0 ]]; then
@@ -134,6 +233,16 @@ ProcessArgs() {
     case $1 in
         -a|--authn)
         export AUTHN=`echo $2 | tr '[:upper:]' '[:lower:]'`
+        shift # past argument
+        shift # past value
+        ;;
+        -k|--kraft-mode)
+        export KRAFT_MODE=`echo $2 | tr '[:upper:]' '[:lower:]'`
+        shift # past argument
+        shift # past value
+        ;;
+        -c|--controller-quorum)
+        export CONTROLLER_QUORUM="${2}"
         shift # past argument
         shift # past value
         ;;
@@ -159,6 +268,19 @@ ProcessArgs() {
         ;;
         -n|--nohup)
         export NOHUP=1
+        shift # past argument
+        ;;
+        -C|--cluster-id)
+        export CLUSTER_ID="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        -f|--fresh)
+        export FRESH=1
+        shift # past argument
+        ;;
+        -D|--dry-run)
+        export DRY_RUN=1
         shift # past argument
         ;;
         -h|--help)
@@ -191,15 +313,17 @@ main() {
     EchoVars
     GenerateProperties
 
-    MyEcho "INFO" "Starting broker ${NODE_ID} ..."
-    MyEcho "INFO" "${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${NODE_ID}.properties"
-    if [[ ${NOHUP} -eq 1 ]] ; then
-        nohup ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${NODE_ID}.properties 2>&1 > ${LOG_DIR}/ak_${NODE_ID}.log &
-    else
-        ${CONFLUENT_HOME}/bin/kafka-server-start ${CFG_DIR}/server_${NODE_ID}.properties
-    fi
+    MyEcho "INFO" "Starting ${NODE_TYPE} DC ${DC_ID} node ${NODE_ID} ..."
+    MyEcho "INFO" "${CONFLUENT_HOME}/bin/kafka-server-start ${PROP_FILE}"
+    if [[ ${DRY_RUN} -eq 0 ]] ; then
+        if [[ ${NOHUP} -eq 1 ]] ; then
+            nohup ${CONFLUENT_HOME}/bin/kafka-server-start ${PROP_FILE} 2>&1 > ${LOG_DIR}/${NODE_TYPE}_${DC_ID}_${NODE_ID}_nohup.log &
+        else
+            ${CONFLUENT_HOME}/bin/kafka-server-start ${PROP_FILE}
+        fi
 
-    echo "AK_${DC_ID}_${NODE_ID}=${MY_IP}:${LISTENERS_PORT}" >> ${STATE_FILE}
+        echo "${NODE_TYPE}_${DC_ID}_${NODE_ID}=${MY_IP}:${LISTENERS_PORT}" >> ${STATE_FILE}
+    fi
 }
 
 ######################################################################

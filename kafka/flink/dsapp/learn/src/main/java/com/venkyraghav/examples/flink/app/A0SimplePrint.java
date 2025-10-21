@@ -15,7 +15,6 @@ import picocli.CommandLine.Command;
 @Command(name = "00_simpleprint", mixinStandardHelpOptions = true, usageHelpAutoWidth = true, showDefaultValues = true)
 public class A0SimplePrint extends ClientCommand {
     private static final Logger LOGGER = LoggerFactory.getLogger(A0SimplePrint.class);
-    private StreamExecutionEnvironment env;
 
     public static final Customer[] CUSTOMERS = new Customer[] {
         new Customer(12L, "Alice", LocalDate.of(1984, 3, 12)),
@@ -24,7 +23,6 @@ public class A0SimplePrint extends ClientCommand {
     };
 
     public Integer process() {
-        env = StreamExecutionEnvironment.getExecutionEnvironment();
         try {
             for (int i = 0; i < 50 && keepRunning; i++) {
                 env.fromElements(CUSTOMERS)

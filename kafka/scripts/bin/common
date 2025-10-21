@@ -40,6 +40,7 @@ CheckDirectoryOrExit() {
         MyEcho "ERROR" "${1} -> ${2} does not exist"
         exit 1
     fi
+    echo ${2}
 }
 
 CheckExecutableOrExit() {
@@ -50,8 +51,8 @@ CheckExecutableOrExit() {
 }
 
 CheckExistOrDownload() {
-    JOLOKIA_JAR="${1}/${2}"
-    if [[ ! -f ${JOLOKIA_JAR} ]] ; then
+    DOWNLOAD_FILE="${1}/${2}"
+    if [[ ! -f ${DOWNLOAD_FILE} ]] ; then
         wget "${3}" -P "${1}"/
     fi
 }
@@ -165,8 +166,12 @@ CheckNodeNotRunningOrExit() {
 CheckCPRunning() {
     CheckRunning "ZK"
     RUNNING_ZK=${RUNNING}
+    CheckRunning "CONTROLLER"
+    RUNNING_ZK=$( ${RUNNING_ZK} + ${RUNNING} )
     CheckRunning "AK"
     RUNNING_AK=${RUNNING}
+    CheckRunning "KRAFTBROKER"
+    RUNNING_AK=$( ${RUNNING_AK} + ${RUNNING} )
     CheckRunning "SR"
     RUNNING_SR=${RUNNING}
     CheckRunning "REST"
@@ -176,7 +181,7 @@ CheckCPRunning() {
     CheckRunning "C3"
     RUNNING_C3=${RUNNING}
 
-    RUNNING_CP=$(( $RUNNING_AK + $RUNNING_C3 + $RUNNING_CONNECT + $RUNNING_CP + $RUNNING_REST + $RUNNING_SR + $RUNNING_ZK ))
+    RUNNING_CP=$( $RUNNING_AK + $RUNNING_C3 + $RUNNING_CONNECT + $RUNNING_CP + $RUNNING_REST + $RUNNING_SR + $RUNNING_ZK )
 }
 
 RunJ2() {
@@ -203,30 +208,42 @@ CheckCPTemplate() {
     CheckFileOrExit "${TEMPLATE_DIR}/control-center-${1}.properties.template"
 }
 
+GetConfluentVersion() {
+    CONFLUENT_VERSION=`${CONFLUENT_HOME}/bin/kafka-server-start --version |grep -v "INFO"`
+    export CONFLUENT_VERSION
+    CONFLUENT_MAJOR_VERSION=`echo ${CONFLUENT_VERSION} | cut -c1-1`
+    export CONFLUENT_MAJOR_VERSION
+}
+
 Precheck() {
-    AbsDir
-    export SCRIPT_DIR=${ABSPATH}
-    export JAR_DIR=$( CheckOrCreateDir ${ABSPATH}/../jar )
-    export GEN_DIR=$( CheckOrCreateDir ${ABSPATH}/../generated )
-    export PROP_DIR=${ABSPATH}/../prop
-    export CFG_DIR=$( CheckOrCreateDir ${GEN_DIR}/config )
-    export DATA_DIR=$( CheckOrCreateDir ${GEN_DIR}/data )
-    export LOG_DIR=$( CheckOrCreateDir ${GEN_DIR}/logs )
-    export J2_DIR=${ABSPATH}/../j2
-    export TEMPLATE_DIR=${ABSPATH}/../template
-    export STATE_FILE=${DATA_DIR}/.state
-
-    CheckDirectoryOrExit "CONFLUENT_HOME" "${CONFLUENT_HOME}"
-    CheckDirectoryOrExit "JAVA_HOME" "${JAVA_HOME}"
-    CheckDirectoryOrExit "TEMPLATE_DIR" "${TEMPLATE_DIR}"
-    CheckDirectoryOrExit "PROP_DIR" "${PROP_DIR}"
-
-    CheckExecutableOrExit "kafka-server-start"
-    CheckExecutableOrExit "zookeeper-server-start"
+    export CONFLUENT_HOME=$( CheckDirectoryOrExit "CONFLUENT_HOME" "${CONFLUENT_HOME}" )
+    export JAVA_HOME=$( CheckDirectoryOrExit "JAVA_HOME" "${JAVA_HOME}" )
     CheckExecutableOrExit "wget"
     CheckExecutableOrExit "envsubst"
     CheckExecutableOrExit "jq"
     # CheckExecutableOrExit "yq"
+
+    CheckExecutableOrExit "kafka-server-start"
+
+    GetConfluentVersion
+    if [[ ${CONFLUENT_MAJOR_VERSION} -lt 8 ]] ; then
+        CheckExecutableOrExit "zookeeper-server-start"
+    else
+        CheckExecutableOrExit "kafka-storage"
+    fi
+
+    AbsDir
+    export SCRIPT_DIR=${ABSPATH}
+
+    export JAR_DIR=$( CheckDirectoryOrExit "JAR_DIR" "${ABSPATH}/../jar" )
+    export TEMPLATE_DIR=$( CheckDirectoryOrExit "TEMPLATE_DIR" "${ABSPATH}/../template" )
+    export PROP_DIR=$( CheckDirectoryOrExit "PROP_DIR" "${ABSPATH}/../prop" )
+
+    export GEN_DIR=$( CheckOrCreateDir ${CONFLUENT_HOME}/../cp${CONFLUENT_MAJOR_VERSION}/generated )
+    export CFG_DIR=$( CheckOrCreateDir ${GEN_DIR}/config )
+    export DATA_DIR=$( CheckOrCreateDir ${GEN_DIR}/data )
+    export LOG_DIR=$( CheckOrCreateDir ${GEN_DIR}/logs )
+    export STATE_FILE=${DATA_DIR}/.state
 
     CheckExistOrDownload "${JAR_DIR}" "jolokia-jvm-1.6.2-agent.jar" "https://repo1.maven.org/maven2/org/jolokia/jolokia-jvm/1.6.2/jolokia-jvm-1.6.2-agent.jar"
     CheckExistOrDownload "${JAR_DIR}" "jmx_prometheus_javaagent-0.16.1.jar" "https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.16.1/jmx_prometheus_javaagent-0.16.1.jar"
@@ -241,6 +258,40 @@ Precheck() {
     CheckFileOrExit "${TEMPLATE_DIR}/log4j.properties.template"
     CheckCPTemplate "noauth"
     # TODO add more authN types after generating template files
+}
+
+ValidateControllerQuorum() {
+    CONTROLLER_QUORUM=$1
+    regex='^([0-9]+@[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+)(,([0-9]+@[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+))*$'
+    if [[ ${CONTROLLER_QUORUM} =~ ${regex} ]]; then
+      MyEcho "INFO" "✅ Valid format ${CONTROLLER_QUORUM}"
+    else
+      MyEcho "ERROR" "❌ Invalid format ${CONTROLLER_QUORUM} for option -c or --controller-quorum"
+      Usage
+      exit 1
+    fi
+
+    CONTROLLER_QUORUM_BOOTSTRAP=`echo ${CONTROLLER_QUORUM}|sed 's/.@//g'`
+    export CONTROLLER_QUORUM CONTROLLER_QUORUM_BOOTSTRAP
+}
+
+ValidateKraftMode() {
+    KRAFT_MODE=$1
+    export KRAFT_MODE
+    case ${KRAFT_MODE} in
+        none)
+        NODE_TYPE="AK"
+        ;;
+        kraftbroker|controller)
+        NODE_TYPE=`echo ${KRAFT_MODE} |tr '[:lower:]' '[:upper:]'`
+        ValidateControllerQuorum "${CONTROLLER_QUORUM}"
+        ;;
+        *)
+        MyEcho "ERROR" "Unknown value ${KRAFT_MODE} for option -k or --kraft-mode"
+        Usage
+        exit 1
+        ;;
+    esac
 }
 
 ValidateAuthNMethodOrExit() {

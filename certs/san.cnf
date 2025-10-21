@@ -1,0 +1,23 @@
+[ req ]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[ req_distinguished_name ]
+C  = US
+ST = GA
+L  = Atlanta
+O  = MyOrg
+CN = server.myorg.local
+
+[ v3_req ]
+subjectAltName = @alt_names
+extendedKeyUsage = serverAuth
+
+[ alt_names ]
+DNS.1 = venkycpcgateway1.eastus2.cloudapp.azure.com
+DNS.2 = venkycpcgateway2.eastus2.cloudapp.azure.com
+DNS.3 = venkycpcgateway.eastus2.cloudapp.azure.com
+DNS.4 = venkycpcgateway-*.eastus2.cloudapp.azure.com
+DNS.5 = venkycpcgatewaylb-*.kafka.venky.com
+DNS.6 = venkycpcgatewaylb.kafka.venky.com

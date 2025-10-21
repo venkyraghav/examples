@@ -6,6 +6,8 @@ Usage() {
     echo "  -D|--dry-run: perform dry run (default: false)"
     echo "  -c|--components: Components to start takes care of dependency. Values all, zk, ak, sr, rest, connect, c3, c3only (default: all)"
     echo "  -f|--fresh: create fresh cluster (default: false)"
+    echo "  -k|--kraft-mode. Values none, controller, kraftbroker (default: ${DEFAULT_KRAFT_MODE}"
+    echo "  -c|--controller-quorum (default: ${DEFAULT_CONTROLLER_QUORUM}"
     echo "  -d|--num-dc: number of data centers (default: 1)"
     echo "  -n|--num-broker: number of brokers per DC (default: 1)"
     echo "  -a|--authn: authn method. Values noauth, plain, scram, gssapi, rbac (default: noauth)"
@@ -14,6 +16,10 @@ Usage() {
 
 # Validate
 Validate() {
+    ValidateKraftMode "${KRAFT_MODE}"
+    ValidateReplicationFactorOrExit "${REPLICATION_FACTOR}" "${MIN_ISR}"
+    ValidateAuthNMethodOrExit "${AUTHN}"
+
     if [[ ! -d ${CONFLUENT_HOME} ]] ; then
         MyEcho "ERROR" "CONFLUENT_HOME is not set"
         exit 1
@@ -38,21 +44,6 @@ Validate() {
           MIN_ISR=$(( ${REPLICATION_FACTOR} - 1 ))
         fi
     fi
-    case ${AUTHN} in
-        noauth|plain)
-        export AUTHN
-        ;;
-        scram|gssapi|rbac)
-        MyEcho "ERROR" "Unsupported ${AUTHN} for option -a or --authn. Scripts needs to enhanced"
-        Usage
-        exit 1
-        ;;
-        *)
-        MyEcho "ERROR" "Unknown value ${AUTHN} for option -a or --authn"
-        Usage
-        exit 1
-        ;;
-    esac
 
     CheckCPRunning
     if [[ ${FRESH} -eq 1 && ${RUNNING_CP} -gt 0 ]] ; then

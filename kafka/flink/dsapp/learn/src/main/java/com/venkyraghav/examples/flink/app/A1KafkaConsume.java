@@ -22,12 +22,9 @@ import java.time.Duration;
 @Command(name = "01_kafkaconsume", mixinStandardHelpOptions = true, usageHelpAutoWidth = true, showDefaultValues = true)
 public class A1KafkaConsume extends ClientCommand {
     private static final Logger LOGGER = LoggerFactory.getLogger(A1KafkaConsume.class);
-    private StreamExecutionEnvironment env;
-
 
     @Override
     public Integer process() {
-        env = StreamExecutionEnvironment.getExecutionEnvironment();
         // set up a Kafka source
         KafkaSource<Transaction> transactionSource =
             KafkaSource.<Transaction>builder()

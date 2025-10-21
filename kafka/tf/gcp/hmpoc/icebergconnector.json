@@ -1,0 +1,34 @@
+{
+  "name": "iceberg-gcs-sink",
+  "connector.class": "org.apache.iceberg.kafka.connect.IcebergSinkConnector",
+  "tasks.max": "2",
+  "topics": "your-kafka-topic",
+  "iceberg.catalog.type": "hadoop",
+  "iceberg.catalog.warehouse": "gs://solutionsarchitect-01-venky-highmark-data-bucket",
+  "iceberg.catalog.hadoop.fs.gs.impl": "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem",
+  "iceberg.catalog.hadoop.fs.gs.project.id": "solutionsarchitect-01",
+  "iceberg.catalog.hadoop.fs.gs.auth.service.account.json.keyfile": "/path/to/keyfile.json",
+
+  "value.converter": "io.confluent.connect.avro.AvroConverter",
+  "value.converter.schema.registry.url": "https://<your-schema-registry>",
+
+  "iceberg.catalog.create.table": "true",
+  "iceberg.catalog.schema.evolution": "true",
+
+  "iceberg.catalog.name": "gcs_catalog",
+  "iceberg.catalog.type": "hadoop",
+  "iceberg.catalog.warehouse": "gs://solutionsarchitect-01-venky-highmark-data-bucket",
+
+  "iceberg.tables": "ecommerce.orders",
+  "iceberg.write.format": "parquet",
+  "iceberg.partition.spec": "day(ts)",
+
+  "flush.size": "10000",
+  "flush.interval.ms": "60000",
+
+  "errors.tolerance": "all",
+  "errors.deadletterqueue.topic.name": "dlq-iceberg",
+  "errors.deadletterqueue.context.headers.enable": "true",
+  "errors.log.enable": "true",
+  "errors.log.include.messages": "true"
+}

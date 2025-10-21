@@ -19,11 +19,8 @@ import picocli.CommandLine.Command;
 public class A2KafkaCopy extends ClientCommand {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(A2KafkaCopy.class);
-    private StreamExecutionEnvironment env;
-
     @Override
     public Integer process() {
-        env = StreamExecutionEnvironment.getExecutionEnvironment();
         String topic = "transactions";
 
         // set up a Kafka source

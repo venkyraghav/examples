@@ -1,0 +1,381 @@
+#!/bin/bash
+
+# Usage
+Usage() {
+    echo "Usage: ${PROG_NAME}"
+    echo "  -a|--server-alias: Server alias (default: ${DEFAULT_SERVER_ALIAS})"
+    echo "  -c|--ca-alias: CA alias (default: ${DEFAULT_CA_ALIAS})"
+    echo "  -p|--password: password for the generated certificates (default: ${DEFAULT_PASSWORD})"
+    echo "  -S|--san-template: SAN template file. Provide san-config or san-dns"
+    echo "  -d|--san-dns: SAN DNS entries (default: ${DEFAULT_SAN_DNS})"
+    echo "  -O|--overwrite: flag to overwrite all certs (default: ${DEFAULT_OVERWRITE})"
+    # echo "  -t|--generate-truststore: flag to generate truststore (default: ${DEFAULT_GEN_TRUSTSTORE})"
+    # echo "  -A|--generate-all: flag to generate all certs (default: ${DEFAULT_GEN_ALL})"
+    echo "  -o|--cn-ou: CN OU string. unimplemented"
+    echo "  -s|--san-config: SAN config file with DNS and SAN names. Provide san-config or san-dns"
+    echo "  -h|--help: print help"
+}
+
+# MyEcho
+MyEcho() {
+    echo [`date +"%Y-%m-%d %H:%M:%S"`] $1 $2
+}
+
+# AbsPath
+AbsPath() {
+    cd "$(dirname "$1")"
+    printf "%s/%s\n" "$(pwd)" "$(basename "$1")"
+    cd "$OLDPWD"
+}
+
+# AbsDir
+AbsDir() {
+    ABSPATH=$( AbsPath ${base_dir} )
+}
+
+# RunEnvsubst
+RunEnvsubst() {
+    CheckFileOrExit ${1}
+    if [[ -f $2 ]]; then
+        MyEcho "WARN" "$2 exist. Overwriting ..."
+    fi
+    envsubst < $1 > $2
+}
+
+# CheckDirectoryOrExit
+CheckDirectoryOrExit() {
+    if [[ ! -d ${2} ]] ; then
+        MyEcho "ERROR" "${1} -> ${2} does not exist"
+        exit 1
+    fi
+    echo ${2}
+}
+
+# CheckExecutableOrExit
+CheckExecutableOrExit() {
+    if [[ ! -x $(which ${1}) ]] ; then
+        MyEcho "ERROR" "${1} is not in path"
+        exit 1
+    fi
+}
+
+# CheckFile
+CheckFile() {
+    if [[ -f ${1} ]] ; then
+        echo 1
+    else
+        echo 0
+    fi
+}
+
+# CheckFileOrExit
+CheckFileOrExit() {
+    if [[ ! -f ${1} ]] ; then
+        MyEcho "ERROR" "${1} does not exist"
+        exit 1
+    fi
+}
+
+# CheckOrCreateDir
+CheckOrCreateDir() {
+    DIR=$1
+    mkdir -p ${DIR}
+    echo ${DIR}
+}
+
+# Precheck
+Precheck() {
+    export JAVA_HOME=$( CheckDirectoryOrExit "JAVA_HOME" "${JAVA_HOME}" )
+    CheckExecutableOrExit "keytool"
+    CheckExecutableOrExit "envsubst"
+    CheckExecutableOrExit "openssl"
+
+    AbsDir
+    export SCRIPT_DIR=${ABSPATH}
+    export GEN_DIR=${ABSPATH}/generated
+}
+
+RunEnvsubst() {
+    CheckFileOrExit ${1}
+    if [[ -f $2 ]]; then
+        MyEcho "WARN" "$2 exist. Overwriting ..."
+    fi
+    envsubst < $1 > $2
+}
+
+ProcessDnsEntries() {
+    SAN_DNS_ENTRIES=("${SAN_DNS}")
+    SAN_DNS_1PART="${SAN_DNS%%.*}"
+    SAN_DNS_DOMAIN="${SAN_DNS#*.}"
+
+    SAN_DNS_PRINT="DNS.1=${SAN_DNS}"
+    RunEnvsubst ${SAN_TEMPLATE} ${SAN_CFG_FILE}
+    echo ${SAN_DNS_PRINT} >> ${SAN_CFG_FILE}
+
+    for i in `seq 2 10`
+    do
+        SAN_DNS_ENTRY=${SAN_DNS_1PART}-${i}.${SAN_DNS_DOMAIN}
+        SAN_DNS_ENTRIES+=(${SAN_DNS_ENTRY})
+        SAN_DNS_PRINT="DNS.${i}=${SAN_DNS_ENTRY}"
+        echo ${SAN_DNS_PRINT} >> ${SAN_CFG_FILE}
+    done
+    MyEcho "INFO" "DNS Entry Print ${SAN_DNS_PRINT}"
+    for entry in "${SAN_DNS_ENTRIES[@]}"
+    do
+        printf "DNS Entry ${entry}"
+    done
+}
+
+# ProcessSanTemplate
+ProcessSanTemplate() {
+    if [[ ! -z "${SAN_CFG}" ]]; then
+        export SAN_CFG_FILE=${SAN_CFG}
+        return
+    fi
+
+    if [[ -z "${SAN_TEMPLATE}" ]]; then
+        MyEcho "ERROR" "${SAN_TEMPLATE} is required when not using `san-cfg`"
+        Usage
+    fi
+    if [[ -z "${SAN_DNS}" ]]; then
+        MyEcho "ERROR" "${SAN_DNS} is required when using `san-template`"
+        Usage
+    fi
+
+    export SAN_CFG_FILE=${SAN_TEMPLATE}.cnf
+    ProcessDnsEntries
+}
+
+# Validate
+Validate() {
+    if [[ ! -z "${SAN_CFG_FILE}" ]]; then
+        CheckFileOrExit "${SAN_CFG_FILE}"
+    fi
+}
+
+# ExportVars
+ExportVars() {
+    export ROOTCA_KEY=${GEN_DIR}/${CA_ALIAS}.key
+    export ROOTCA_PEM=${GEN_DIR}/${CA_ALIAS}.pem
+    export SERVER_KEY=${GEN_DIR}/${SERVER_ALIAS}.key
+    export SERVER_CSR=${GEN_DIR}/${SERVER_ALIAS}.csr
+    export SERVER_CRT=${GEN_DIR}/${SERVER_ALIAS}.crt
+    export SERVER_P12=${GEN_DIR}/${SERVER_ALIAS}.p12
+    export SERVER_JKS=${GEN_DIR}/${SERVER_ALIAS}-keystore.jks
+    export TRUST_JKS=${GEN_DIR}/${SERVER_ALIAS}-truststore.jks
+}
+
+# EchoVars
+EchoVars() {
+    echo ""
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "Begin All Vars"
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "PROG_NAME=${PROG_NAME}"
+    MyEcho "INFO" "SAN_CFG=${SAN_CFG}"
+    MyEcho "INFO" "CA_ALIAS=${CA_ALIAS}"
+    MyEcho "INFO" "PASSWORD=${PASSWORD}"
+    MyEcho "INFO" "CN_OU=${CN_OU}"
+    MyEcho "INFO" "SAN_DNS=${SAN_DNS}"
+    MyEcho "INFO" "SAN_TEMPLATE=${SAN_TEMPLATE}"
+    MyEcho "INFO" "SAN_CFG_FILE=${SAN_CFG_FILE}"
+    MyEcho "INFO" "SERVER_ALIAS=${SERVER_ALIAS}"
+    MyEcho "INFO" "OVERWRITE=${OVERWRITE}"
+    MyEcho "INFO" "ROOTCA_KEY=${ROOTCA_KEY}"
+    MyEcho "INFO" "ROOTCA_PEM=${ROOTCA_PEM}"
+    MyEcho "INFO" "SERVER_KEY=${SERVER_KEY}"
+    MyEcho "INFO" "SERVER_CSR=${SERVER_CSR}"
+    MyEcho "INFO" "SERVER_CRT=${SERVER_CRT}"
+    MyEcho "INFO" "SERVER_P12=${SERVER_P12}"
+    MyEcho "INFO" "SERVER_JKS=${SERVER_JKS}"
+    MyEcho "INFO" "TRUST_JKS=${TRUST_JKS}"
+    MyEcho "INFO" "####################"
+    MyEcho "INFO" "End All Vars"
+    MyEcho "INFO" "####################"
+    echo ""
+    echo ""
+}
+
+# ProcessArgs
+ProcessArgs() {
+    POSITIONAL_ARGS=()
+
+    export DEFAULT_CA_ALIAS="ca"
+    export CA_ALIAS=${DEFAULT_CA_ALIAS}
+
+    export DEFAULT_SERVER_ALIAS="server"
+    export SERVER_ALIAS=${DEFAULT_SERVER_ALIAS}
+
+    export DEFAULT_OVERWRITE=0
+    export OVERWRITE=${DEFAULT_OVERWRITE}
+
+    export DEFAULT_PASSWORD="changeme"
+    export PASSWORD=${DEFAULT_PASSWORD}
+
+    export DEFAULT_SAN_TEMPLATE="san.template"
+    export SAN_TEMPLATE=${DEFAULT_SAN_TEMPLATE}
+
+    export DEFAULT_SAN_DNS=venky.eastus2.cloudapp.azure.com
+    export SAN_DNS=${DEFAULT_SAN_DNS}
+
+    export CN_OU=
+    export SAN_CFG=
+
+    export PROG_NAME=$0
+    if [[ $# -eq 0 ]]; then
+        return
+    fi
+
+    while [[ $# -gt 0 ]]; do
+    case $1 in
+        -O|--overwrite)
+        export OVERWRITE=1
+        shift # past argument
+        ;;
+        -S|--san-template)
+        export SAN_TEMPLATE=`echo $2 | tr '[:upper:]' '[:lower:]'`
+        shift # past argument
+        shift # past value
+        ;;
+        -d|--san-dns)
+        export SAN_DNS=`echo $2 | tr '[:upper:]' '[:lower:]'`
+        shift # past argument
+        shift # past value
+        ;;
+        -o|--cn-ou)
+        MyEcho "INFO" "CN OU unimplemented parameters"
+        export CN_OU=`echo $2 | tr '[:upper:]' '[:lower:]'`
+        shift # past argument
+        shift # past value
+        ;;
+        -s|--san-config)
+        export SAN_CFG=`echo $2 | tr '[:upper:]' '[:lower:]'`
+        shift # past argument
+        shift # past value
+        ;;
+        -p|--password)
+        export PASSWORD=`echo $2 | tr '[:upper:]' '[:lower:]'`
+        shift # past argument
+        shift # past value
+        ;;
+        -c|--ca-alias)
+        export CA_ALIAS=`echo $2 | tr '[:upper:]' '[:lower:]'`
+        shift # past argument
+        shift # past value
+        ;;
+        -a|--server-alias)
+        export SERVER_ALIAS=`echo $2 | tr '[:upper:]' '[:lower:]'`
+        shift # past argument
+        shift # past value
+        ;;
+        -h|--help)
+        MyEcho "INFO" "Printing help"
+        Usage
+        exit 0
+        ;;
+        -*|--*)
+        MyEcho "ERROR" "Unknown option $1"
+        Usage
+        exit 1
+        ;;
+        *)
+        POSITIONAL_ARGS+=("$1") # save positional arg
+        shift # past argument
+        ;;
+    esac
+    done
+
+    ProcessSanTemplate
+
+    set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+}
+
+# CreateCerts
+CreateCerts() {
+    if [[ ${OVERWRITE} -eq 1 ]]; then
+        MyEcho "INFO" "Overwriting all certs ..."
+        rm -Rf ${GEN_DIR}
+        CheckOrCreateDir ${GEN_DIR}
+    else
+        MyEcho "INFO" "Use existing certs ..."
+        return
+    fi
+
+    if [[ ! -f ${ROOTCA_KEY} ]]; then
+        openssl genrsa -out ${ROOTCA_KEY} 4096
+        openssl req -x509 -new -nodes -key ${ROOTCA_KEY} \
+            -sha256 -days 3650 \
+            -out ${ROOTCA_PEM} \
+            -subj "/C=US/ST=GA/L=Atlanta/O=MyOrg/CN=MyRootCA"
+    else
+        MyEcho "INFO" "Using existing ${ROOTCA_KEY}"
+    fi
+
+    if [[ ! -f ${SERVER_KEY} ]]; then
+        openssl genrsa -out ${SERVER_KEY} 2048
+
+        openssl req -new \
+            -key ${SERVER_KEY} \
+            -out ${SERVER_CSR} \
+            -subj "/C=US/ST=GA/L=Atlanta/O=MyOrg/CN=server.myorg.local"
+
+        openssl x509 -req \
+            -in ${SERVER_CSR} \
+            -CA ${ROOTCA_PEM} \
+            -CAkey ${ROOTCA_KEY} -CAcreateserial \
+            -out ${SERVER_CRT} -days 3650 -sha256 \
+            -extfile ${SAN_CFG_FILE} -extensions v3_req
+
+        openssl x509 -in ${SERVER_CRT} -text -noout | grep -A 1 "Subject Alternative Name"
+
+        openssl pkcs12 -export \
+            -in ${SERVER_CRT} \
+            -inkey ${SERVER_KEY} \
+            -certfile ${ROOTCA_PEM} \
+            -out ${SERVER_P12} \
+            -name "${SERVER_ALIAS}" \
+            -password pass:${PASSWORD}
+
+        keytool -importkeystore \
+            -srckeystore ${SERVER_P12} \
+            -srcstoretype PKCS12 \
+            -srcstorepass ${PASSWORD} \
+            -destkeystore ${SERVER_JKS} \
+            -deststoretype JKS \
+            -deststorepass ${PASSWORD} \
+            -alias ${SERVER_ALIAS}
+        keytool -list -v -keystore ${SERVER_JKS} -storepass ${PASSWORD}
+    else
+        MyEcho "INFO" "Using existing ${SERVER_KEY}"
+    fi
+
+    if [[ ! -f ${TRUST_JKS} ]]; then
+        keytool -importcert \
+            -trustcacerts \
+            -file ${ROOTCA_PEM} \
+            -alias ${CA_ALIAS} \
+            -keystore ${TRUST_JKS} \
+            -storepass ${PASSWORD} \
+            -noprompt
+        keytool -list -v -keystore ${TRUST_JKS} -storepass ${PASSWORD}
+    else
+        MyEcho "INFO" "Using existing ${TRUST_JKS}"
+    fi
+}
+
+
+# Main function
+main() {
+    Precheck
+    ProcessArgs $@
+    ExportVars
+    Validate
+    EchoVars
+    CreateCerts
+}
+
+######################################################################
+# Main Processing Starts Here
+######################################################################
+base_dir=$(dirname $0)
+main $@

@@ -1,0 +1,27 @@
+[ req ]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[ req_distinguished_name ]
+C  = US
+ST = GA
+L  = Atlanta
+O  = MyOrg
+CN = server.myorg.local
+
+[ v3_req ]
+subjectAltName = @alt_names
+extendedKeyUsage = serverAuth
+
+[ alt_names ]
+DNS.1=venkynewentry.example.com
+DNS.2=venkynewentry-2.example.com
+DNS.3=venkynewentry-3.example.com
+DNS.4=venkynewentry-4.example.com
+DNS.5=venkynewentry-5.example.com
+DNS.6=venkynewentry-6.example.com
+DNS.7=venkynewentry-7.example.com
+DNS.8=venkynewentry-8.example.com
+DNS.9=venkynewentry-9.example.com
+DNS.10=venkynewentry-10.example.com

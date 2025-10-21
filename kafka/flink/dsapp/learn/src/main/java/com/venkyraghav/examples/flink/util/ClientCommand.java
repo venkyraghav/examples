@@ -2,6 +2,7 @@ package com.venkyraghav.examples.flink.util;
 
 import com.venkyraghav.examples.flink.util.picocli.ArgException;
 import com.venkyraghav.examples.flink.util.picocli.FileExistsConverter;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.utils.Utils;
@@ -18,6 +19,7 @@ import static java.lang.Thread.sleep;
 public abstract class ClientCommand implements Callable<Integer> {
     @CommandLine.Option(names = {"-c", "--command.config"}, paramLabel = "COMMAND.CONFIG", description = "File with Configuration Parameters to Flink Client", required = false, converter = FileExistsConverter.class)
     private String commandConfig;
+    protected StreamExecutionEnvironment env;
 
     protected volatile boolean keepRunning = true;
 
@@ -60,6 +62,7 @@ public abstract class ClientCommand implements Callable<Integer> {
         try {
             // Runtime.getRuntime().addShutdownHook(new Thread(this::cleanup));
             validate();
+            env = StreamExecutionEnvironment.getExecutionEnvironment();
             process();
 //            while (keepRunning) {
 //                try { sleep(10000L);} catch (Exception ignored) {}

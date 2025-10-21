@@ -69,46 +69,46 @@ public class Main implements Callable<Integer>{
         return props;
     }
 
-    public static void mainworking(String[] args) {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        String topic = "transactions";
-        try {
-            loadCommandConfig("/opt/flink/downloads/command_config.properties");
-
-            // set up a Kafka source
-            KafkaSource<Transaction> transactionSource =
-                    KafkaSource.<Transaction>builder()
-                            .setStartingOffsets(OffsetsInitializer.earliest())
-                            .setProperties(getProperties())
-                            .setBootstrapServers(getBootstrapServer(null))
-                            .setTopics(topic)
-                            .setValueOnlyDeserializer(new TransactionSerde())
-                            .build();
-
-            //DataStream<Transaction> transactionStream =
-            //    env.fromSource(transactionSource, WatermarkStrategy.noWatermarks(), "Transactions");
-
-            KafkaSink<Transaction> sink = KafkaSink.<Transaction>builder()
-                    .setKafkaProducerConfig(getProperties())
-                    .setBootstrapServers(getBootstrapServer(null))
-                    .setRecordSerializer(KafkaRecordSerializationSchema.builder()
-                            .setTopic(topic + "_copy")
-                            .setValueSerializationSchema(new TransactionSerde())
-                            .build())
-                    .setDeliveryGuarantee(DeliveryGuarantee.EXACTLY_ONCE)
-                    .build();
-
-            DataStream<Transaction> stream = env.fromSource(transactionSource, WatermarkStrategy.noWatermarks(), "Kafka Source");
-            stream.print();
-            stream.sinkTo(sink);
-
-            env.execute("Kafka Copier");
-            // Thread.sleep(0L);
-        } catch (Exception e) {
-            log.error("Exception", e);
-        }
-
-    }
+//    public static void mainworking(String[] args) {
+//        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+//        String topic = "transactions";
+//        try {
+//            loadCommandConfig("/opt/flink/downloads/command_config.properties");
+//
+//            // set up a Kafka source
+//            KafkaSource<Transaction> transactionSource =
+//                    KafkaSource.<Transaction>builder()
+//                            .setStartingOffsets(OffsetsInitializer.earliest())
+//                            .setProperties(getProperties())
+//                            .setBootstrapServers(getBootstrapServer(null))
+//                            .setTopics(topic)
+//                            .setValueOnlyDeserializer(new TransactionSerde())
+//                            .build();
+//
+//            //DataStream<Transaction> transactionStream =
+//            //    env.fromSource(transactionSource, WatermarkStrategy.noWatermarks(), "Transactions");
+//
+//            KafkaSink<Transaction> sink = KafkaSink.<Transaction>builder()
+//                    .setKafkaProducerConfig(getProperties())
+//                    .setBootstrapServers(getBootstrapServer(null))
+//                    .setRecordSerializer(KafkaRecordSerializationSchema.builder()
+//                            .setTopic(topic + "_copy")
+//                            .setValueSerializationSchema(new TransactionSerde())
+//                            .build())
+//                    .setDeliveryGuarantee(DeliveryGuarantee.EXACTLY_ONCE)
+//                    .build();
+//
+//            DataStream<Transaction> stream = env.fromSource(transactionSource, WatermarkStrategy.noWatermarks(), "Kafka Source");
+//            stream.print();
+//            stream.sinkTo(sink);
+//
+//            env.execute("Kafka Copier");
+//            // Thread.sleep(0L);
+//        } catch (Exception e) {
+//            log.error("Exception", e);
+//        }
+//
+//    }
     public static void main(String[] args) {
         CommandLine mainCommand = new CommandLine(new Main());
         try {
