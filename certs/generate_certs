@@ -9,9 +9,10 @@ Usage() {
     echo "  -S|--san-template: SAN template file. Provide san-config or san-dns"
     echo "  -d|--san-dns: SAN DNS entries (default: ${DEFAULT_SAN_DNS})"
     echo "  -o|--overwrite: flag to overwrite all certs (default: ${DEFAULT_OVERWRITE})"
+    echo "  -p|--generate-pkcs12: flag to generate pkcs12 store file (default: ${DEFAULT_PKCS12})"
     echo "  -O|--ou: OU string (default: ${DEFAULT_OU})"
     echo "  -s|--san-config: SAN config file with DNS and SAN names. Provide san-config or san-dns"
-    echo "  -h|--help: print help"
+    echo "  -h|--help: print this help"
 }
 
 # MyEcho
@@ -93,6 +94,7 @@ Precheck() {
     export GEN_DIR=${ABSPATH}/generated
 }
 
+# RunEnvsubst
 RunEnvsubst() {
     CheckFileOrExit ${1}
     if [[ -f $2 ]]; then
@@ -101,6 +103,7 @@ RunEnvsubst() {
     envsubst < $1 > $2
 }
 
+# ProcessDnsEntries
 ProcessDnsEntries() {
     SAN_DNS_ENTRIES=("${SAN_DNS}")
     SAN_DNS_1PART="${SAN_DNS%%.*}"
@@ -116,11 +119,6 @@ ProcessDnsEntries() {
         SAN_DNS_ENTRIES+=(${SAN_DNS_ENTRY})
         SAN_DNS_PRINT="DNS.${i}=${SAN_DNS_ENTRY}"
         echo ${SAN_DNS_PRINT} >> ${SAN_CFG_FILE}
-    done
-    MyEcho "INFO" "DNS Entry Print ${SAN_DNS_PRINT}"
-    for entry in "${SAN_DNS_ENTRIES[@]}"
-    do
-        printf "DNS Entry ${entry}"
     done
 }
 
@@ -160,7 +158,7 @@ ExportVars() {
     export SERVER_CRT=${GEN_DIR}/${SERVER_ALIAS}.crt
     export SERVER_P12=${GEN_DIR}/${SERVER_ALIAS}.p12
     export SERVER_JKS=${GEN_DIR}/${SERVER_ALIAS}-keystore.jks
-    export TRUST_JKS=${GEN_DIR}/${SERVER_ALIAS}-truststore.jks
+    export TRUST_JKS=${GEN_DIR}/${CA_ALIAS}-truststore.jks
 }
 
 # EchoVars
@@ -179,6 +177,7 @@ EchoVars() {
     MyEcho "INFO" "SAN_CFG_FILE=${SAN_CFG_FILE}"
     MyEcho "INFO" "SERVER_ALIAS=${SERVER_ALIAS}"
     MyEcho "INFO" "OVERWRITE=${OVERWRITE}"
+    MyEcho "INFO" "PKCS12=${PKCS12}"
     MyEcho "INFO" "ROOTCA_KEY=${ROOTCA_KEY}"
     MyEcho "INFO" "ROOTCA_PEM=${ROOTCA_PEM}"
     MyEcho "INFO" "SERVER_KEY=${SERVER_KEY}"
@@ -207,6 +206,9 @@ ProcessArgs() {
     export DEFAULT_OVERWRITE=0
     export OVERWRITE=${DEFAULT_OVERWRITE}
 
+    export DEFAULT_PKCS12=1
+    export PKCS12=${DEFAULT_PKCS12}
+
     export DEFAULT_PASSWORD="changeme"
     export PASSWORD=${DEFAULT_PASSWORD}
 
@@ -228,6 +230,10 @@ ProcessArgs() {
 
     while [[ $# -gt 0 ]]; do
     case $1 in
+        -p|--generate-pkcs12)
+        export PKCS12=1
+        shift # past argument
+        ;;
         -o|--overwrite)
         export OVERWRITE=1
         shift # past argument
@@ -295,7 +301,7 @@ CreateCerts() {
         MyEcho "INFO" "Overwriting all certs ..."
         rm -Rf ${GEN_DIR}
     fi
-    CheckOrCreateDir ${GEN_DIR}
+    IGNORE_VALUE=$( CheckOrCreateDir ${GEN_DIR} )
 
     MyEcho "INFO" "Use existing certs (if exists)..."
     if [[ ! -f ${ROOTCA_KEY} ]]; then
@@ -329,8 +335,10 @@ CreateCerts() {
             -out ${SERVER_CRT} -days 3650 -sha256 \
             -extfile ${SAN_CFG_FILE} -extensions v3_req
 
-        MyEcho "INFO" "Listing ${SERVER_CRT} ..."
+        MyEcho "INFO" "Listing Subject Alternative Name from ${SERVER_CRT} ..."
+        echo "---------"
         openssl x509 -in ${SERVER_CRT} -text -noout | grep -A 1 "Subject Alternative Name"
+        echo "---------"
 
         MyEcho "INFO" "Generating ${SERVER_P12} ..."
         openssl pkcs12 -export \
@@ -342,17 +350,30 @@ CreateCerts() {
             -password pass:${PASSWORD}
 
         MyEcho "INFO" "Generating ${SERVER_JKS} ..."
-        keytool -importkeystore \
-            -srckeystore ${SERVER_P12} \
-            -srcstoretype PKCS12 \
-            -srcstorepass ${PASSWORD} \
-            -destkeystore ${SERVER_JKS} \
-            -deststoretype JKS \
-            -deststorepass ${PASSWORD} \
-            -alias ${SERVER_ALIAS}
+        if [[ ${PKCS12} ]]; then
+            keytool -importkeystore \
+                -srckeystore ${SERVER_P12} \
+                -srcstoretype PKCS12 \
+                -srcstorepass ${PASSWORD} \
+                -destkeystore ${SERVER_JKS} \
+                -deststoretype PKCS12 \
+                -deststorepass ${PASSWORD} \
+                -alias ${SERVER_ALIAS}
+        else
+            keytool -importkeystore \
+                -srckeystore ${SERVER_P12} \
+                -srcstoretype PKCS12 \
+                -srcstorepass ${PASSWORD} \
+                -destkeystore ${SERVER_JKS} \
+                -deststoretype JKS \
+                -deststorepass ${PASSWORD} \
+                -alias ${SERVER_ALIAS} > /dev/null 2>&1 | egrep -v "Warning:|proprietary format" > /dev/null 2>&1
+        fi
 
         MyEcho "INFO" "Listing ${SERVER_JKS} ..."
-        keytool -list -v -keystore ${SERVER_JKS} -storepass ${PASSWORD}
+        echo "---------"
+        keytool -list -v -keystore ${SERVER_JKS} -storepass ${PASSWORD} | egrep "Alias name|Creation date|Entry type|Certificate|Owner|Issuer|Valid|DNSName"|grep -v "fingerprints"
+        echo "---------"
     else
         MyEcho "INFO" "Using existing ${SERVER_KEY}"
     fi
@@ -368,12 +389,13 @@ CreateCerts() {
             -noprompt
 
         MyEcho "INFO" "Listing ${TRUST_JKS} ..."
-        keytool -list -v -keystore ${TRUST_JKS} -storepass ${PASSWORD}
+        echo "---------"
+        keytool -list -v -keystore ${TRUST_JKS} -storepass ${PASSWORD} | egrep "Alias name|Creation date|Entry type|Certificate|Owner|Issuer|Valid|DNSName"|grep -v "fingerprints"
+        echo "---------"
     else
         MyEcho "INFO" "Using existing ${TRUST_JKS}"
     fi
 }
-
 
 # Main function
 main() {
