@@ -8,10 +8,8 @@ Usage() {
     echo "  -p|--password: password for the generated certificates (default: ${DEFAULT_PASSWORD})"
     echo "  -S|--san-template: SAN template file. Provide san-config or san-dns"
     echo "  -d|--san-dns: SAN DNS entries (default: ${DEFAULT_SAN_DNS})"
-    echo "  -O|--overwrite: flag to overwrite all certs (default: ${DEFAULT_OVERWRITE})"
-    # echo "  -t|--generate-truststore: flag to generate truststore (default: ${DEFAULT_GEN_TRUSTSTORE})"
-    # echo "  -A|--generate-all: flag to generate all certs (default: ${DEFAULT_GEN_ALL})"
-    echo "  -o|--cn-ou: CN OU string. unimplemented"
+    echo "  -o|--overwrite: flag to overwrite all certs (default: ${DEFAULT_OVERWRITE})"
+    echo "  -O|--ou: OU string (default: ${DEFAULT_OU})"
     echo "  -s|--san-config: SAN config file with DNS and SAN names. Provide san-config or san-dns"
     echo "  -h|--help: print help"
 }
@@ -175,7 +173,7 @@ EchoVars() {
     MyEcho "INFO" "SAN_CFG=${SAN_CFG}"
     MyEcho "INFO" "CA_ALIAS=${CA_ALIAS}"
     MyEcho "INFO" "PASSWORD=${PASSWORD}"
-    MyEcho "INFO" "CN_OU=${CN_OU}"
+    MyEcho "INFO" "OU=${OU}"
     MyEcho "INFO" "SAN_DNS=${SAN_DNS}"
     MyEcho "INFO" "SAN_TEMPLATE=${SAN_TEMPLATE}"
     MyEcho "INFO" "SAN_CFG_FILE=${SAN_CFG_FILE}"
@@ -218,7 +216,9 @@ ProcessArgs() {
     export DEFAULT_SAN_DNS=venky.eastus2.cloudapp.azure.com
     export SAN_DNS=${DEFAULT_SAN_DNS}
 
-    export CN_OU=
+    export DEFAULT_OU=DefaultOrg
+    export OU=${DEFAULT_OU}
+
     export SAN_CFG=
 
     export PROG_NAME=$0
@@ -228,7 +228,7 @@ ProcessArgs() {
 
     while [[ $# -gt 0 ]]; do
     case $1 in
-        -O|--overwrite)
+        -o|--overwrite)
         export OVERWRITE=1
         shift # past argument
         ;;
@@ -242,9 +242,9 @@ ProcessArgs() {
         shift # past argument
         shift # past value
         ;;
-        -o|--cn-ou)
+        -O|--ou)
         MyEcho "INFO" "CN OU unimplemented parameters"
-        export CN_OU=`echo $2 | tr '[:upper:]' '[:lower:]'`
+        export OU=`echo $2 | tr '[:upper:]' '[:lower:]'`
         shift # past argument
         shift # past value
         ;;
@@ -295,18 +295,16 @@ CreateCerts() {
     if [[ ${OVERWRITE} -eq 1 ]]; then
         MyEcho "INFO" "Overwriting all certs ..."
         rm -Rf ${GEN_DIR}
-        CheckOrCreateDir ${GEN_DIR}
-    else
-        MyEcho "INFO" "Use existing certs ..."
-        return
     fi
+    CheckOrCreateDir ${GEN_DIR}
 
+    MyEcho "INFO" "Use existing certs (if exists)..."
     if [[ ! -f ${ROOTCA_KEY} ]]; then
         openssl genrsa -out ${ROOTCA_KEY} 4096
         openssl req -x509 -new -nodes -key ${ROOTCA_KEY} \
             -sha256 -days 3650 \
             -out ${ROOTCA_PEM} \
-            -subj "/C=US/ST=GA/L=Atlanta/O=MyOrg/CN=MyRootCA"
+            -subj "/C=US/ST=GA/L=Atlanta/O=${OU}/CN=${CA_ALIAS}"
     else
         MyEcho "INFO" "Using existing ${ROOTCA_KEY}"
     fi
@@ -317,7 +315,7 @@ CreateCerts() {
         openssl req -new \
             -key ${SERVER_KEY} \
             -out ${SERVER_CSR} \
-            -subj "/C=US/ST=GA/L=Atlanta/O=MyOrg/CN=server.myorg.local"
+            -subj "/C=US/ST=GA/L=Atlanta/O=${OU}/CN=${SAN_DNS}"
 
         openssl x509 -req \
             -in ${SERVER_CSR} \

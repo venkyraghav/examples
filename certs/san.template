@@ -7,8 +7,8 @@ prompt = no
 C  = US
 ST = GA
 L  = Atlanta
-O  = MyOrg
-CN = server.myorg.local
+O  = $OU
+CN = $SAN_DNS
 
 [ v3_req ]
 subjectAltName = @alt_names
