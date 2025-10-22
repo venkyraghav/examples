@@ -8,7 +8,7 @@ C  = US
 ST = GA
 L  = Atlanta
 O  = $OU
-CN = $SAN_DNS
+CN = $SAN_CN
 
 [ v3_req ]
 subjectAltName = @alt_names
