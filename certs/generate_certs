@@ -7,7 +7,7 @@ Usage() {
     echo "  -c|--ca-alias: CA alias (default: ${DEFAULT_CA_ALIAS})"
     echo "  -p|--password: password for the generated certificates (default: ${DEFAULT_PASSWORD})"
     echo "  -S|--san-template: SAN template file. Provide san-config or san-dns"
-    echo "  -d|--san-dns: SAN DNS entries (default: ${DEFAULT_SAN_DNS})"
+    echo "  -d|--san-dns: SAN DNS comma separated entries (default: ${DEFAULT_SAN_DNS})"
     echo "  -o|--overwrite: flag to overwrite all certs (default: ${DEFAULT_OVERWRITE})"
     echo "  -p|--generate-pkcs12: flag to generate pkcs12 store file (default: ${DEFAULT_PKCS12})"
     echo "  -O|--ou: OU string (default: ${DEFAULT_OU})"
@@ -105,21 +105,38 @@ RunEnvsubst() {
 
 # ProcessDnsEntries
 ProcessDnsEntries() {
-    SAN_DNS_ENTRIES=("${SAN_DNS}")
-    SAN_DNS_1PART="${SAN_DNS%%.*}"
-    SAN_DNS_DOMAIN="${SAN_DNS#*.}"
+    SAN_DNS_LIST=${SAN_DNS}
+    if [[ ! "${SAN_DNS_LIST}" == *,* ]]; then
+        SAN_DNS_1PART="${SAN_DNS%%.*}"
+        SAN_DNS_DOMAIN="${SAN_DNS#*.}"
 
-    SAN_DNS_PRINT="DNS.1=${SAN_DNS}"
-    RunEnvsubst ${SAN_TEMPLATE} ${SAN_CFG_FILE}
-    echo ${SAN_DNS_PRINT} >> ${SAN_CFG_FILE}
+        for i in `seq 2 10`
+        do
+            SAN_DNS_LIST=${SAN_DNS_LIST}","${SAN_DNS_1PART}-${i}.${SAN_DNS_DOMAIN}
+        done
+    fi
+    if [[ ! -z "${SAN_DNS_LIST}" ]]; then
+        MyEcho "INFO" "${SAN_DNS_LIST} is comma separated. Parsing list"
+        OLD_IFS=${IFS}
+        IFS=',' read -r -a SAN_DNS_ENTRIES <<< "${SAN_DNS_LIST}"
 
-    for i in `seq 2 10`
-    do
-        SAN_DNS_ENTRY=${SAN_DNS_1PART}-${i}.${SAN_DNS_DOMAIN}
-        SAN_DNS_ENTRIES+=(${SAN_DNS_ENTRY})
-        SAN_DNS_PRINT="DNS.${i}=${SAN_DNS_ENTRY}"
-        echo ${SAN_DNS_PRINT} >> ${SAN_CFG_FILE}
-    done
+        SAN_DNS_1PART="${SAN_DNS_ENTRIES[0]%%.*}"
+        SAN_DNS_DOMAIN="${SAN_DNS_ENTRIES[0]#*.}"
+
+        if [[ -z "${SAN_DNS_DOMAIN}" ]]; then
+            MyEcho "INFO" "Using ${DEFAULT_SAN_DNS} as domain as it was missing in san dns"
+            export SAN_DNS_DOMAIN=${DEFAULT_SAN_DNS}
+        fi
+        export SAN_CN=${SAN_DNS_1PART}.${SAN_DNS_DOMAIN}
+        i=1
+        RunEnvsubst ${SAN_TEMPLATE} ${SAN_CFG_FILE}
+        for SAN_DNS_ENTRY in "${SAN_DNS_ENTRIES[@]}"
+        do
+            SAN_DNS_PRINT="DNS.${i}=${SAN_DNS_ENTRY}"
+            echo ${SAN_DNS_PRINT} >> ${SAN_CFG_FILE}
+            i=$((i+1))
+        done
+    fi
 }
 
 # ProcessSanTemplate
@@ -325,7 +342,7 @@ CreateCerts() {
         openssl req -new \
             -key ${SERVER_KEY} \
             -out ${SERVER_CSR} \
-            -subj "/C=US/ST=GA/L=Atlanta/O=${OU}/CN=${SAN_DNS}"
+            -subj "/C=US/ST=GA/L=Atlanta/O=${OU}/CN=${SAN_CN}"
 
         MyEcho "INFO" "Generating ${SERVER_CRT} ..."
         openssl x509 -req \
