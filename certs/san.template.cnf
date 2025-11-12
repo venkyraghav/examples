@@ -8,15 +8,16 @@ C  = US
 ST = GA
 L  = Atlanta
 O  = venkyorg
-CN = venkynewentry.example.com
+CN = venkycpcgatewaylb.kafka.venky.com
 
 [ v3_req ]
 subjectAltName = @alt_names
 extendedKeyUsage = serverAuth
 
 [ alt_names ]
-DNS.1=venkynewentry.example.com
-DNS.2=venky1.test
-DNS.3=venky1
-DNS.4=venky2
-DNS.5=venky2.test.com
+DNS.1=venkycpcgatewaylb.kafka.venky.com
+DNS.2=venkycpcgateway1.eastus2.cloudapp.azure.com
+DNS.3=venkycpcgateway2.eastus2.cloudapp.azure.com
+DNS.4=venkycpcgateway.eastus2.cloudapp.azure.com
+DNS.5=venkycpcgateway-*.eastus2.cloudapp.azure.com
+DNS.6=venkycpcgatewaylb-*.kafka.venky.com

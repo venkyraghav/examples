@@ -172,7 +172,7 @@ ExportVars() {
     export ROOTCA_PEM=${GEN_DIR}/${CA_ALIAS}.pem
     export SERVER_KEY=${GEN_DIR}/${SERVER_ALIAS}.key
     export SERVER_CSR=${GEN_DIR}/${SERVER_ALIAS}.csr
-    export SERVER_CRT=${GEN_DIR}/${SERVER_ALIAS}.crt
+    export SERVER_PEM=${GEN_DIR}/${SERVER_ALIAS}.pem
     export SERVER_P12=${GEN_DIR}/${SERVER_ALIAS}.p12
     export SERVER_JKS=${GEN_DIR}/${SERVER_ALIAS}-keystore.jks
     export TRUST_JKS=${GEN_DIR}/${CA_ALIAS}-truststore.jks
@@ -199,7 +199,7 @@ EchoVars() {
     MyEcho "INFO" "ROOTCA_PEM=${ROOTCA_PEM}"
     MyEcho "INFO" "SERVER_KEY=${SERVER_KEY}"
     MyEcho "INFO" "SERVER_CSR=${SERVER_CSR}"
-    MyEcho "INFO" "SERVER_CRT=${SERVER_CRT}"
+    MyEcho "INFO" "SERVER_PEM=${SERVER_PEM}"
     MyEcho "INFO" "SERVER_P12=${SERVER_P12}"
     MyEcho "INFO" "SERVER_JKS=${SERVER_JKS}"
     MyEcho "INFO" "TRUST_JKS=${TRUST_JKS}"
@@ -344,22 +344,22 @@ CreateCerts() {
             -out ${SERVER_CSR} \
             -subj "/C=US/ST=GA/L=Atlanta/O=${OU}/CN=${SAN_CN}"
 
-        MyEcho "INFO" "Generating ${SERVER_CRT} ..."
+        MyEcho "INFO" "Generating ${SERVER_PEM} ..."
         openssl x509 -req \
             -in ${SERVER_CSR} \
             -CA ${ROOTCA_PEM} \
             -CAkey ${ROOTCA_KEY} -CAcreateserial \
-            -out ${SERVER_CRT} -days 3650 -sha256 \
+            -out ${SERVER_PEM} -days 3650 -sha256 \
             -extfile ${SAN_CFG_FILE} -extensions v3_req
 
-        MyEcho "INFO" "Listing Subject Alternative Name from ${SERVER_CRT} ..."
+        MyEcho "INFO" "Listing Subject Alternative Name from ${SERVER_PEM} ..."
         echo "---------"
-        openssl x509 -in ${SERVER_CRT} -text -noout | grep -A 1 "Subject Alternative Name"
+        openssl x509 -in ${SERVER_PEM} -text -noout | grep -A 1 "Subject Alternative Name"
         echo "---------"
 
         MyEcho "INFO" "Generating ${SERVER_P12} ..."
         openssl pkcs12 -export \
-            -in ${SERVER_CRT} \
+            -in ${SERVER_PEM} \
             -inkey ${SERVER_KEY} \
             -certfile ${ROOTCA_PEM} \
             -out ${SERVER_P12} \
