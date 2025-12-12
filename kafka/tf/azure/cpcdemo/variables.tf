@@ -24,5 +24,5 @@ variable "region" {
 variable "instance_type" {
   description = "Type of instances"
   type        = string
-  default     = "Standard_D4s_v4"
+  default     = "Standard_D2s_v5"
 }

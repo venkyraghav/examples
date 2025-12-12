@@ -26,3 +26,9 @@ variable "instance_type" {
   type        = string
   default     = "Standard_D4s_v4"
 }
+
+variable "user_data" {
+  description = "User script to setup the cluster"
+  type        = string
+  default     = ""
+}
