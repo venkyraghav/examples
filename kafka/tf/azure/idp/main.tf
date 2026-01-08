@@ -1,13 +1,31 @@
-# Configure Azure IdP once in org level
+
+data "http" "oidc_discovery" {
+  url = var.oidc_discovery_url
+
+  request_headers = {
+    Accept = "application/json"
+  }
+}
+
+locals {
+  response = jsondecode(data.http.oidc_discovery.response_body)
+  issuer = local.response.issuer
+  jwks_uri = local.response.jwks_uri
+  token_endpoint = local.response.token_endpoint
+}
+
+# Configure IdP once in org level
 # Datasource or import this in other modules
-# data "confluent_identity_provider" "azure" {
+# data "confluent_identity_provider" "idp" {
 #   id = "op-DAmQ"
 # }
-resource "confluent_identity_provider" "azure" {
-  display_name = "Venky IDP: Azure AD"
-  description  = "Venky IDP: Azure AD"
-  issuer       = "https://login.microsoftonline.com/${var.tenant_id}/v2.0"
-  jwks_uri     = "https://login.microsoftonline.com/common/discovery/v2.0/keys"
+resource "confluent_identity_provider" "idp" {
+  display_name = var.idp_name
+  description  = var.idp_description
+  issuer = local.issuer
+  jwks_uri = local.jwks_uri
+
+  depends_on = [data.http.oidc_discovery]
 }
 
 # Data source for Kafka cluster
@@ -22,23 +40,27 @@ data "confluent_kafka_cluster" "cluster" {
 # Configure Identity Pool idpool_dp2_write in the pipeline flow to create IDPools for DataProducts
 resource "confluent_identity_pool" "idpool_dp2_write" {
   identity_provider {
-    id = confluent_identity_provider.azure.id
+    id = confluent_identity_provider.idp.id
   }
   display_name   = "idpool_dp2_write"
   description    = "Access to produce to Dataproduct2 topics"
   identity_claim = "claims.sub"
-  filter         = "claims.iss == \"https://login.microsoftonline.com/${var.tenant_id}/v2.0\" && claims.aud == \"${var.api_scope}\" && \"idpool_dp2_write\" in claims.roles"
+  filter         = "claims.iss == \"${local.issuer}\" && claims.aud == \"${var.api_scope}\" && \"idpool_dp2_write\" in claims.roles"
+
+  depends_on = [data.http.oidc_discovery, confluent_identity_provider.idp]
 }
 
 # Configure Identity Pool idpool_dp2_read in the pipeline flow to create IDPools for DataProducts
 resource "confluent_identity_pool" "idpool_dp2_read" {
   identity_provider {
-    id = confluent_identity_provider.azure.id
+    id = confluent_identity_provider.idp.id
   }
   display_name   = "idpool_dp2_read"
   description    = "Access to consume from Dataproduct2 topics"
   identity_claim = "claims.sub"
-  filter         = "claims.iss == \"https://login.microsoftonline.com/${var.tenant_id}/v2.0\" && claims.aud == \"${var.api_scope}\" && \"idpool_dp2_read\" in claims.roles"
+  filter         = "claims.iss == \"${local.issuer}\" && claims.aud == \"${var.api_scope}\" && \"idpool_dp2_read\" in claims.roles"
+
+  depends_on = [data.http.oidc_discovery, confluent_identity_provider.idp]
 }
 
 # Provide DeveloperWrite on topic2 PREFIX to idpool_dp2_write in the pipeline flow to create roles for DataProducts
@@ -47,6 +69,8 @@ resource "confluent_role_binding" "idpool_dp2_write" {
   role_name = "DeveloperWrite"
 
   crn_pattern = "${data.confluent_kafka_cluster.cluster.rbac_crn}/kafka=${data.confluent_kafka_cluster.cluster.id}/topic=topic2*"
+
+  depends_on = [confluent_identity_pool.idpool_dp2_write, data.confluent_kafka_cluster.cluster]
 }
 
 # Provide DeveloperRead on topic2 PREFIX to idpool_dp2_read in the pipeline flow to create roles for DataProducts
@@ -55,6 +79,8 @@ resource "confluent_role_binding" "idpool_dp2_read" {
   role_name = "DeveloperRead"
 
   crn_pattern = "${data.confluent_kafka_cluster.cluster.rbac_crn}/kafka=${data.confluent_kafka_cluster.cluster.id}/topic=topic2*"
+
+  depends_on = [confluent_identity_pool.idpool_dp2_read, data.confluent_kafka_cluster.cluster]
 }
 
 # Provide DeveloperRead on all Consumer Groups to idpool_dp2_read in the pipeline flow to create roles for DataProducts
@@ -63,4 +89,6 @@ resource "confluent_role_binding" "idpool_dp2_read_cg" {
   role_name = "DeveloperRead"
 
   crn_pattern = "${data.confluent_kafka_cluster.cluster.rbac_crn}/kafka=${data.confluent_kafka_cluster.cluster.id}/group=*"
+
+  depends_on = [confluent_identity_pool.idpool_dp2_read, data.confluent_kafka_cluster.cluster]
 }

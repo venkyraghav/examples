@@ -10,8 +10,20 @@ variable "confluent_cloud_api_secret" {
   sensitive   = true
 }
 
-variable "tenant_id" {
-  description = "Azure Tenant ID"
+variable "idp_name" {
+  description = "IDP Name"
+  type        = string
+  default     = "IDP"
+}
+
+variable "idp_description" {
+  description = "IDP Description"
+  type        = string
+  default     = "IDP"
+}
+
+variable "oidc_discovery_url" {
+  description = "OIDC Discovery URL"
   type        = string
 }
 
