@@ -1,6 +1,0 @@
-oidc_discovery_url  = "https://login.microsoftonline.com/67e9d472-7fbe-48f4-ade6-03e3f3c0dbe6/v2.0/.well-known/openid-configuration"
-idp_name = "Venky IdP - Azure"
-idp_description = "Venky IdP - Azure"
-api_scope  = "78eeb74e-53e0-4fdd-9e5c-b986672d8c90"
-cluster_id = "lkc-pzwy9y"
-env_id     = "env-mzn3gw"
