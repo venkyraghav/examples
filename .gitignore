@@ -18,6 +18,9 @@
 **/*.iml
 **/build
 **/gradle
+**/bin
+**/obj
+**/.vscode
 **/pkg
 **/*.tfstate
 **/*.tfstate.backup
@@ -57,3 +60,13 @@ hs_err_pid*
 
 learnrust/rustlings
 **/input.auto.tfvars
+**/secret*.yaml
+**/secret*.properties
+**/*.pem
+**/*.jks
+**/*.password
+**/*.p12
+**/client*.properties
+**/terraform.tfstate.*
+kafka/java/eiap-deserializer/src/main/resources/consumer.properties
+**/test*

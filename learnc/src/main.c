@@ -1,7 +1,7 @@
 
 #include "common.h"
 #include "linkedlist/linkedlist.h"
-
+#include "arraylist/arraylist.h"
 
 bool test_mode = false;
 bool is_test_mode() {
@@ -13,6 +13,7 @@ void set_test_mode() {
 }
 
 int main() {
-    printf("main\n");
-    return fn_linked_list();
+    // return fn_linked_list();
+    // return fn_linked_list_circular();
+    return fn_array_list_int();
 }

@@ -33,14 +33,9 @@ variable "cc_network_pl_id" {
   type        = string
 }
 
-variable "confluent_cluster_zones" {
-  description = "Confluent cluster zones"
-  type        = list(string)
-}
-
-variable "subnet_prefix" {
-  description = "Azure subnet prefix"
-  type        = string
+variable "subnet_zones" {
+  description = "Confluent subnet zones"
+  type        = map(string)
 }
 
 variable "tags" {

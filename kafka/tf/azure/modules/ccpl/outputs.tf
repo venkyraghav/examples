@@ -17,3 +17,8 @@ output "cc_network_pla_id" {
   value       = confluent_private_link_access.pla.id
   description = "Confluent Private Link Access Id"
 }
+
+output "cc_network_pl" {
+  value       = confluent_network.pl
+  description = "Confluent Network Private Link"
+}

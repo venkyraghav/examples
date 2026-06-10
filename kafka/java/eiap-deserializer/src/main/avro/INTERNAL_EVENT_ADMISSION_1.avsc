@@ -1,0 +1,1 @@
+{"type":"record","name":"INTERNAL_EVENT_ADMISSION_BLOCKING_STARTED","fields":[{"name":"EVENT_CONTEXT","type":"string"},{"name":"TS","type":"long"},{"name":"_SCANNER_ID","type":"long"},{"name":"_RBS_MODULE_ID","type":"string"},{"name":"_GLOBAL_CELL_ID","type":"long"},{"name":"_ADMISSION_ARP_LEVEL","type":"long"}]}

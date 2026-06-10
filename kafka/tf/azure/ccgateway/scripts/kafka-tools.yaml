@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kafka-tools
+  namespace: confluent
+spec:
+  restartPolicy: Never
+  securityContext:
+    # Ensures the container user can read files from the Secret volume
+    fsGroup: 1000
+  containers:
+    - name: tools
+      image: confluentinc/cp-kafka:8.1.0
+      command: ["bash", "-lc"]
+      args:
+        - sleep infinity
+        #- kafka-producer-perf-test --topic test-1wayssl --num-records 100000 --record-size 10 --throughput 10 --producer-props bootstrap.servers=cc.kafka.venky.com:9092 --producer.config /etc/kafka/client-azure/client-azure.properties
+      volumeMounts:
+        - name: client-tls
+          mountPath: /etc/kafka/tls
+          readOnly: true
+        - name: client-primary
+          mountPath: /etc/kafka/client-primary
+          readOnly: true
+        - name: client-dr
+          mountPath: /etc/kafka/client-dr
+          readOnly: true
+  volumes:
+    - name: client-tls
+      secret:
+        secretName: client-tls
+        defaultMode: 0400
+    - name: client-primary
+      secret:
+        secretName: client-primary
+        defaultMode: 0400
+    - name: client-dr
+      secret:
+        secretName: client-dr
+        defaultMode: 0400

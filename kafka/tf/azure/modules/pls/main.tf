@@ -26,16 +26,18 @@ data "azurerm_resource_group" "rg" {
 data "azurerm_virtual_network" "vnet" {
   name                = var.vnet
   resource_group_name = data.azurerm_resource_group.rg.name
+
+  depends_on = [data.azurerm_resource_group.rg]
 }
 
 data "azurerm_subnet" "subnet" {
-  # for_each = var.subnet_name_by_zone
-  for_each = toset(var.confluent_cluster_zones)
+  for_each = var.subnet_zones
 
-  # name                 = each.value
-  name                 = format("%s%s", var.subnet_prefix, each.value)
+  name                 = each.value
   virtual_network_name = data.azurerm_virtual_network.vnet.name
   resource_group_name  = data.azurerm_resource_group.rg.name
+
+  depends_on = [data.azurerm_virtual_network.vnet, data.azurerm_resource_group.rg]
 }
 
 resource "azurerm_private_dns_zone" "hz" {
@@ -43,26 +45,28 @@ resource "azurerm_private_dns_zone" "hz" {
   name                = var.dns_domain
 
   tags = var.tags
+
+  depends_on = [data.azurerm_resource_group.rg]
 }
 
 resource "azurerm_private_endpoint" "endpoint" {
-  # for_each = var.subnet_name_by_zone
-  for_each = toset(var.confluent_cluster_zones)
+  for_each = var.subnet_zones
 
-  name                = "confluent-${var.cc_network_pl_id}-${each.value}"
+  name                = "confluent-${var.cc_network_pl_id}-${each.key}"
   location            = var.region
   resource_group_name = data.azurerm_resource_group.rg.name
 
-  subnet_id = data.azurerm_subnet.subnet[each.value].id
+  subnet_id = data.azurerm_subnet.subnet[each.key].id
 
   private_service_connection {
-    name                              = "confluent-${var.cc_network_pl_id}-${each.value}"
+    name                              = "confluent-${var.cc_network_pl_id}-${each.key}"
     is_manual_connection              = true
-    private_connection_resource_alias = lookup(data.confluent_network.pl.azure[0].private_link_service_aliases, each.value, "\n\nerror: ${each.value} subnet is missing from CCN's Private Link service aliases")
+    private_connection_resource_alias = lookup(data.confluent_network.pl.azure[0].private_link_service_aliases, each.key, "\n\nerror: ${each.key} subnet is missing from CCN's Private Link service aliases")
     request_message                   = "PL"
   }
 
-  tags = var.tags
+  tags       = var.tags
+  depends_on = [data.confluent_network.pl, data.azurerm_resource_group.rg]
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "hz" {
@@ -96,9 +100,9 @@ resource "azurerm_private_dns_a_record" "rr" {
 }
 
 resource "azurerm_private_dns_a_record" "zonal" {
-  for_each = toset(var.confluent_cluster_zones)
+  for_each = var.subnet_zones
 
-  name                = "*.az${each.value}"
+  name                = "*.az${each.key}"
   zone_name           = azurerm_private_dns_zone.hz.name
   resource_group_name = data.azurerm_resource_group.rg.name
   ttl                 = 60
