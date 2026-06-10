@@ -22,9 +22,9 @@ spec:
         - name: client-primary
           mountPath: /etc/kafka/client-primary
           readOnly: true
-        - name: client-dr
-          mountPath: /etc/kafka/client-dr
-          readOnly: true
+        # - name: client-dr
+        #   mountPath: /etc/kafka/client-dr
+        #   readOnly: true
   volumes:
     - name: client-tls
       secret:
@@ -34,7 +34,7 @@ spec:
       secret:
         secretName: client-primary
         defaultMode: 0400
-    - name: client-dr
-      secret:
-        secretName: client-dr
-        defaultMode: 0400
+    # - name: client-dr
+    #   secret:
+    #     secretName: client-dr
+    #     defaultMode: 0400

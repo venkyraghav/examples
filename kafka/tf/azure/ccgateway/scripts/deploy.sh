@@ -34,8 +34,8 @@ kubectl -n confluent create secret generic client-tls \
 kubectl -n confluent create secret generic client-primary \
      --from-file=client-primary.properties=../generated/client-primary.properties
 
-kubectl -n confluent create secret generic client-dr \
-     --from-file=client-dr.properties=../generated/client-dr.properties
+# kubectl -n confluent create secret generic client-dr \
+#      --from-file=client-dr.properties=../generated/client-dr.properties
 
 kubectl -n confluent apply -f gateway.yaml
 

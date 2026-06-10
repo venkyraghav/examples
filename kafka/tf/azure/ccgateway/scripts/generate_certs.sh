@@ -39,4 +39,4 @@ storepass=confluent
 gateway_truststore=${ssl_gateway_dir}/gateway-truststore.jks
 keytool -keystore ${gateway_truststore} -alias CARoot -import -file ${ca_cert} -storepass ${storepass} -noprompt
 
-echo "NOTE: Acquire Primary and DR CC Cluster certifcates using download-certificates.sh"
+# echo "NOTE: Acquire Primary and DR CC Cluster certifcates using download-certificates.sh"

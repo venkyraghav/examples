@@ -22,9 +22,8 @@ spec:
         name: cc-primary-cluster
         bootstrapServers:
           - id: CC_PRIMARY
-            endpoint: pkc-619z3.us-east1.gcp.confluent.cloud:9092
+            endpoint: lkc-dokdm5o.domngv31ozw.eastus2.azure.confluent.cloud:9092
             tls:
-              #secretRef: cc-primary-tls
               ignoreTrustStoreConfig: true
         nodeIdRanges:
           - name: default
@@ -54,9 +53,9 @@ spec:
         bootstrapServerId: CC_PRIMARY
       security:
         auth: passthrough
-#        client:
-#          tls:
-#            secretRef: gateway-tls
+        client:
+          tls:
+            secretRef: gateway-tls
   externalAccess:
     type: loadBalancer
     loadBalancer:

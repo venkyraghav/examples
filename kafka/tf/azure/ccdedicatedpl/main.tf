@@ -24,28 +24,56 @@ module "cc_eastus2" {
   cc_cluster_numckus      = 1
   cc_cluster_availability = "SINGLE_ZONE"
 
-  depends_on = [module.ccpl_eastus2]
+  depends_on = [
+    module.ccpl_eastus2
+  ]
 }
 
-# Create Azure PL in eastus2. Use this when not using ccgateway
-# module "pls_eastus2" {
-#   providers = {
-#     azurerm   = azurerm
-#     confluent = confluent
-#   }
-#   source              = "../modules/pls"
-#   region              = "eastus2"
-#   rg                  = "venky_rg_eastus2"
-#   vnet                = "venky_rg_eastus2_vnet"
-#   arm_subscription_id = var.arm_subscription_id
-#   cc_env              = var.cc_env
-#   subnet_zones        = { "1" : "venky_rg_eastus2_subnet1", "2" : "venky_rg_eastus2_subnet2", "3" : "venky_rg_eastus2_subnet3" }
-#   dns_domain          = module.ccpl_eastus2.cc_network_pl_dns_domain
-#   cc_network_pl_id    = module.ccpl_eastus2.cc_network_pl_id
-#   tags                = local.tags
+# Create Azure PL in eastus2
+module "pls_eastus2" {
+  providers = {
+    azurerm   = azurerm
+    confluent = confluent
+  }
+  source              = "../modules/pls"
+  region              = "eastus2"
+  rg                  = "venky_rg_eastus2"
+  vnet                = "venky_rg_eastus2_vnet"
+  arm_subscription_id = var.arm_subscription_id
+  cc_env              = var.cc_env
+  subnet_zones        = { "1" : "venky_rg_eastus2_subnet1", "2" : "venky_rg_eastus2_subnet2", "3" : "venky_rg_eastus2_subnet3" }
+  dns_domain          = module.ccpl_eastus2.cc_network_pl_dns_domain
+  cc_network_pl_id    = module.ccpl_eastus2.cc_network_pl_id
+  tags                = local.tags
 
-#   depends_on = [module.ccpl_eastus2, module.cc_eastus2]
-# }
+  depends_on = [
+    module.ccpl_eastus2,
+    module.cc_eastus2
+  ]
+}
+
+# Create the EastUS2 PLS in AKS cluster
+module "cc_gateway_eastus2_to_eastus2_aks_pls" {
+  providers = {
+    azurerm   = azurerm
+    confluent = confluent
+  }
+  source              = "../modules/pls"
+  region              = "eastus2"
+  rg                  = "MC_venky_rg_eastus2_venky-aks-eastus2_eastus2"
+  vnet                = "aks-vnet-22750017"
+  arm_subscription_id = var.arm_subscription_id
+  cc_env              = var.cc_env
+  subnet_zones        = { "1" : "aks-subnet", "2" : "aks-subnet", "3" : "aks-subnet" }
+  dns_domain          = module.ccpl_eastus2.cc_network_pl_dns_domain
+  cc_network_pl_id    = module.ccpl_eastus2.cc_network_pl_id
+  tags                = local.tags
+
+  depends_on = [
+    module.ccpl_eastus2,
+    module.cc_eastus2
+  ]
+}
 
 # # Create Azure PL in cross connectivity from eastus2 to CC west cluster. Use this when not using ccgateway
 # module "pls_eastus2_xpost" {
@@ -141,26 +169,6 @@ module "cc_eastus2" {
 # depends_on = [module.ccpl_eastus2, module.cc_eastus2]
 # }
 
-# Create the EastUS2 PLS in AKS cluster
-# module "cc_gateway_eastus2_to_eastus2_aks_pls" {
-#   providers = {
-#     azurerm   = azurerm
-#     confluent = confluent
-#   }
-#   source              = "../modules/pls"
-#   region              = "eastus2"
-#   rg                  = "MC_venky_rg_eastus2_venky-aks-eastus2_eastus2"
-#   vnet                = "aks-vnet-22750017"
-#   arm_subscription_id = var.arm_subscription_id
-#   cc_env              = var.cc_env
-#   subnet_zones        = { "1" : "aks-subnet", "2" : "aks-subnet", "3" : "aks-subnet" }
-#   dns_domain          = module.ccpl_eastus2.cc_network_pl_dns_domain
-#   cc_network_pl_id    = module.ccpl_eastus2.cc_network_pl_id
-#   tags                = local.tags
-
-#   depends_on = [module.cc_gateway_eastus2, module.ccpl_eastus2, module.cc_eastus2]
-# }
-
 # Create the WestUS2 PLS in AKS cluster
 # module "cc_gateway_eastus2_to_westus2_aks_pls" {
 #   providers = {
@@ -179,16 +187,4 @@ module "cc_eastus2" {
 #   tags                = local.tags
 
 #   depends_on = [module.cc_gateway_eastus2, module.ccpl_eastus2, module.cc_eastus2]
-# }
-
-# Create AKS clusters in westus2
-# UNCOMMENT THIS
-# module "cc_gateway_westus2" {
-#   source           = "../modules/aks"
-#   aks_cluster_name = format("%s-westus2", var.aks_cluster_name)
-#   aks_rg           = "venky_rg_westus2"
-#   node_count       = var.node_count
-#   region           = "westus2"
-#   instance_type    = var.instance_type
-#   tags             = local.tags
 # }
