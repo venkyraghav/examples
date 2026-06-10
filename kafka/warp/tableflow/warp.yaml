@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: warp
+  name: warp
+spec:
+  containers:
+    - image: public.ecr.aws/warpstream-labs/warpstream_agent:latest
+      name: warp
+      env:
+        - name: WARPSTREAM_DISCOVERY_KAFKA_HOSTNAME_OVERRIDE
+          value: "warp"
+      command: ["/bin/sh", "-c"]
+      args: ["echo Hello $ENV_VAR_1 && sleep 3600"]
