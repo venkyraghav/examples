@@ -69,4 +69,3 @@ learnrust/rustlings
 **/client*.properties
 **/terraform.tfstate.*
 kafka/java/eiap-deserializer/src/main/resources/consumer.properties
-**/test*
