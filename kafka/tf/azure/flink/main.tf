@@ -7,11 +7,9 @@ terraform {
   }
 }
 
-variable "cloud" {
-  default = "AZURE"
-}
-variable "region" {
-  default = "eastus"
+locals {
+  cloud  = "AZURE"
+  region = "eastus"
 }
 
 variable "oauth_external_token_url" {
@@ -71,9 +69,9 @@ data "confluent_schema_registry_cluster" "main" {
   }
 }
 
-data "confluent_flink_region" "region" {
-  cloud  = var.cloud
-  region = var.region
+data "confluent_flink_region" "us-east" {
+  cloud  = local.cloud
+  region = local.region
 }
 
 data "confluent_flink_compute_pool" "main" {
