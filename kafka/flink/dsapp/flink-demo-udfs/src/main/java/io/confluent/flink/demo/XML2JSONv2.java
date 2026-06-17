@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.xml.stream.XMLInputFactory;
 import javax.xml.transform.stream.StreamSource;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
@@ -19,18 +20,21 @@ import javax.xml.validation.Validator;
 import org.apache.flink.table.functions.FunctionContext;
 import org.apache.flink.table.functions.ScalarFunction;
 import org.apache.flink.util.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import com.ctc.wstx.stax.WstxInputFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.xml.XmlFactory;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 
 class LookupResource {
     static Map<String, String> resources = new HashMap<String, String>();
+    static Map<String, String> errors = new HashMap<String, String>();
 
     static void clear() {
         resources.clear();
+        errors.clear();
     }
 
     static String put(String resourceName, String resourceContent) {
@@ -53,37 +57,78 @@ class LookupResource {
         }
         return resources.containsKey(resourceName);
     }
+
+    static String putError(String resourceName, String resourceContent) {
+        if (StringUtils.isNullOrWhitespaceOnly(resourceName) || StringUtils.isNullOrWhitespaceOnly(resourceContent)) {
+            return null;
+        }
+        return errors.put(resourceName, resourceContent);
+    }
+
+    static String getError(String resourceName) {
+        if (StringUtils.isNullOrWhitespaceOnly(resourceName)) {
+            return null;
+        }
+        return errors.get(resourceName);
+    }
+
+    static boolean containsError(String resourceName) {
+        if (StringUtils.isNullOrWhitespaceOnly(resourceName)) {
+            return false;
+        }
+        return errors.containsKey(resourceName);
+    }
+
+    static String getJson(Map<String, String> map) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        try {
+            return objectMapper.writeValueAsString(map);
+        } catch (JsonProcessingException e) {
+            return "{\"Exception\" : \"JsonProcessingException\", \"Message\" : \"" + e.getMessage() + " converting map to json\"}";
+        }
+    }
 }
 
 public class XML2JSONv2 extends ScalarFunction {
-    private String endpoint;
+    private transient String endpoint;
+    private transient long REFRESH_TIME;
+    private transient long loadTime;
+    private transient Map<String, String> errMap;
+    private transient HttpClient httpClient;
 
-    private final static long REFRESH_TIME = Duration.ofHours(4).toMillis();
-    private final static String XML2JSON2_NAME = "xml2json2_name";
-    private final static String XML2JSON2_ENDPOINT = "https://raw.githubusercontent.com/venkyraghav/restartgo/refs/heads/main";
-    private final static String XML2JSON2_CONNECTION = """
-        CREATE CONNECTION GITHUB_RAWCONTENT
-        WITH ('type' = 'REST', 'endpoint' = 'https://raw.githubusercontent.com/', 'token' = '');
-    """;
+    public XML2JSONv2(){
+        this.errMap = new HashMap<String, String>();
+        httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
+    }
 
-    private transient long loadTime = 0L;
-    // private transient Map<String, String> resources = new HashMap<String, String>();
+    public XML2JSONv2(HttpClient httpClient){
+        this.errMap = new HashMap<String, String>();
+        this.httpClient = httpClient;
+    }
 
     @Override
     public void open(FunctionContext context) throws Exception {
         // Retrieve connection details using the connection name defined in SQL
         if (context != null) {
-            this.endpoint = context.getJobParameter("GITHUB_RAWCONTENT", null);
+            this.endpoint = context.getJobParameter("GITHUB_RAWCONTENT.endpoint", null);
+        } else {
+            errMap.put("context", "is null");
+            //System.out.println("context is null");
         }
+        REFRESH_TIME = Duration.ofHours(4).toMillis();
+        loadTime = 0L;
 
         if (StringUtils.isNullOrWhitespaceOnly(this.endpoint)) {
-            this.endpoint = XML2JSON2_ENDPOINT;
+            errMap.put("endpoint", "is not defined");
         }
+        // System.out.println("Endpoint => " + this.endpoint);
     }
 
     public String eval(String xml, String xmlSchemaName) {
         if (xml == null) {
-            System.out.println("xml is empty");
             return "";
         }
         return eval(xml.getBytes(), xmlSchemaName);
@@ -91,7 +136,6 @@ public class XML2JSONv2 extends ScalarFunction {
 
     public String eval(byte[] xml, String xmlSchemaName) {
         if (xml == null || xml.length == 0) {
-            System.out.println("xml is empty");
             return "";
         }
 
@@ -100,15 +144,20 @@ public class XML2JSONv2 extends ScalarFunction {
             if (StringUtils.isNullOrWhitespaceOnly(xmlSchemaName) == false) {
                 xsd = retrieveResource(xmlSchemaName);
                 if (xsd == null) {
-                    System.out.println("xsd not found for " + xmlSchemaName);
-                    return "";
+                    if (LookupResource.containsError(xmlSchemaName)) {
+                        errMap.put("Error", "schema is " + xmlSchemaName + ". refer other errors");
+                    } else {
+                        errMap.put("Error", "schema" + xmlSchemaName + " not found");
+                    }
+                    return LookupResource.getJson(errMap);
                 }
             }
             return convert(xml, xsd);
         } catch (Exception e) {
-            System.out.println("Exception " + e);
-
-            return "{\"Exception\": \"" +  e.getLocalizedMessage() + "\"}";
+            e.printStackTrace();
+            errMap.put("Exception", e.getClass().getName());
+            errMap.put("Message", e.getMessage());
+            return LookupResource.getJson(errMap);
         }
     }
 
@@ -124,28 +173,34 @@ public class XML2JSONv2 extends ScalarFunction {
                 validate(xml, xmlSchema);
             }
 
+            XMLInputFactory inputFactory = new WstxInputFactory();
+            // Disable namespace processing so prefixes and xsi elements are treated as plain text or skipped
+            inputFactory.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, Boolean.FALSE);
+
             // Step 1: Read XML into JsonNode
-            XmlMapper xmlMapper = new XmlMapper();
+            XmlMapper xmlMapper = new XmlMapper(new XmlFactory(inputFactory, null));
+
+            //xmlMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
             JsonNode node = xmlMapper.readTree(xml);
 
             // Step 2: Convert JsonNode to JSON string
             ObjectMapper jsonMapper = new ObjectMapper();
             return jsonMapper.writerWithDefaultPrettyPrinter().writeValueAsString(node);
-        } catch (IOException e) {
-            System.out.println("Exception " + e);
-            return "{\"Exception\": \"" +  e.getLocalizedMessage() + "\"}";
+        } catch (Exception e) {
+            e.printStackTrace();
+            errMap.put("Exception", e.getClass().getName());
+            errMap.put("Message", e.getMessage());
+            return LookupResource.getJson(errMap);
         }
     }
 
     private void validate(byte[] xml, String xsd) throws Exception {
-        // log.info("XSD {}", xsd);
-        // System.out.println("XSD " + xsd);
         SchemaFactory factory = SchemaFactory.newInstance("http://www.w3.org/2001/XMLSchema");
 
-        Schema schema = factory.newSchema(new StreamSource(new StringReader(xsd)));
+        Schema schema = factory.newSchema(new StreamSource(new StringReader(xsd), "dummy.xsd"));
         Validator validator = schema.newValidator();
 
-        validator.validate(new StreamSource(new ByteArrayInputStream(xml)));
+        validator.validate(new StreamSource(new ByteArrayInputStream(xml), "dummy.xml"));
     }
 
     private String retrieveResource(String resourceName) throws IOException, InterruptedException {
@@ -153,37 +208,41 @@ public class XML2JSONv2 extends ScalarFunction {
             loadTime = System.currentTimeMillis();
             LookupResource.clear();
         }
+        if (LookupResource.containsError(resourceName)) {
+            return null;
+        }
         if (LookupResource.containsKey(resourceName)) {
             return LookupResource.get(resourceName);
         }
-        // log.info("Endpoint is {}", this.endpoint + "/" + resourceName);
-        // System.out.println("Endpoint is " + this.endpoint + "/" + resourceName);
-        // Initialize HttpClient
-        HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build();
-
-        System.out.println("HTTP URL=> " + this.endpoint + "venkyraghav/restartgo/refs/heads/main/" + resourceName);
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(this.endpoint + "venkyraghav/restartgo/refs/heads/main/" + resourceName))
-            .GET()
-            .build();
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        switch (response.statusCode()) {
-            case 200 -> {
-                LookupResource.put(resourceName, response.body());
-                if (loadTime == 0) {
-                    loadTime = System.currentTimeMillis();
-                } else if (System.currentTimeMillis() - loadTime > REFRESH_TIME) {
-                    loadTime = System.currentTimeMillis();
-                    LookupResource.clear();
+        try {
+            // System.out.println("URI => " + this.endpoint + "venkyraghav/restartgo/refs/heads/main/" + resourceName);
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(this.endpoint + "venkyraghav/restartgo/refs/heads/main/" + resourceName))
+                .GET()
+                .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            switch (response.statusCode()) {
+                case 200 -> {
+                    LookupResource.put(resourceName, response.body());
+                    if (loadTime == 0) {
+                        loadTime = System.currentTimeMillis();
+                    } else if (System.currentTimeMillis() - loadTime > REFRESH_TIME) {
+                        loadTime = System.currentTimeMillis();
+                        LookupResource.clear();
+                    }
+                    return LookupResource.get(resourceName);
                 }
-                return LookupResource.get(resourceName);
+                default -> {
+                    errMap.put("statusCode", String.valueOf(response.statusCode()));
+                    errMap.put("url", this.endpoint + "venkyraghav/restartgo/refs/heads/main/" + resourceName);
+                    LookupResource.putError(resourceName, LookupResource.getJson(errMap));
+                }
             }
-            case 404 -> { // TODO Build a cache of failed lookups
-
-            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            errMap.put("Exception", e.getClass().getName());
+            errMap.put("Message", e.getMessage());
+            LookupResource.putError(resourceName, LookupResource.getJson(errMap));
         }
         return null;
     }
