@@ -2,6 +2,7 @@ package io.confluent.flink.demo;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.Serializable;
 import java.io.StringReader;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -29,12 +30,18 @@ import com.fasterxml.jackson.dataformat.xml.XmlFactory;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 
 class LookupResource {
-    static Map<String, String> resources = new HashMap<String, String>();
-    static Map<String, String> errors = new HashMap<String, String>();
+    private static Map<String, String> resources = new HashMap<String, String>();
+    private static Map<String, String> errors = new HashMap<String, String>();
+    private static Map<String, String> errMap = new HashMap<String, String>();
 
     static void clear() {
         resources.clear();
         errors.clear();
+        clearErrMap();
+    }
+
+    static void clearErrMap() {
+        errMap.clear();
     }
 
     static String put(String resourceName, String resourceContent) {
@@ -79,25 +86,30 @@ class LookupResource {
         return errors.containsKey(resourceName);
     }
 
-    static String getJson(Map<String, String> map) {
+    static String putErrMap(String key, String val) {
+        if (StringUtils.isNullOrWhitespaceOnly(key) || StringUtils.isNullOrWhitespaceOnly(val)) {
+            return null;
+        }
+        return errMap.put(key, val);
+    }
+
+    static String getErrMapJson() {
         ObjectMapper objectMapper = new ObjectMapper();
         try {
-            return objectMapper.writeValueAsString(map);
+            return objectMapper.writeValueAsString(errMap);
         } catch (JsonProcessingException e) {
             return "{\"Exception\" : \"JsonProcessingException\", \"Message\" : \"" + e.getMessage() + " converting map to json\"}";
         }
     }
 }
 
-public class XML2JSONv2 extends ScalarFunction {
+public class XML2JSONv2 extends ScalarFunction implements Serializable {
     private transient String endpoint;
     private transient long REFRESH_TIME;
     private transient long loadTime;
-    private transient Map<String, String> errMap;
     private transient HttpClient httpClient;
 
     public XML2JSONv2(){
-        this.errMap = new HashMap<String, String>();
         httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
             .followRedirects(HttpClient.Redirect.NORMAL)
@@ -105,7 +117,6 @@ public class XML2JSONv2 extends ScalarFunction {
     }
 
     public XML2JSONv2(HttpClient httpClient){
-        this.errMap = new HashMap<String, String>();
         this.httpClient = httpClient;
     }
 
@@ -115,14 +126,14 @@ public class XML2JSONv2 extends ScalarFunction {
         if (context != null) {
             this.endpoint = context.getJobParameter("GITHUB_RAWCONTENT.endpoint", null);
         } else {
-            errMap.put("context", "is null");
+            LookupResource.putErrMap("context", "is null");
             //System.out.println("context is null");
         }
         REFRESH_TIME = Duration.ofHours(4).toMillis();
         loadTime = 0L;
 
         if (StringUtils.isNullOrWhitespaceOnly(this.endpoint)) {
-            errMap.put("endpoint", "is not defined");
+            LookupResource.putErrMap("endpoint", "is not defined");
         }
         // System.out.println("Endpoint => " + this.endpoint);
     }
@@ -140,24 +151,25 @@ public class XML2JSONv2 extends ScalarFunction {
         }
 
         try {
+            LookupResource.clearErrMap();
             String xsd = "";
             if (StringUtils.isNullOrWhitespaceOnly(xmlSchemaName) == false) {
                 xsd = retrieveResource(xmlSchemaName);
                 if (xsd == null) {
                     if (LookupResource.containsError(xmlSchemaName)) {
-                        errMap.put("Error", "schema is " + xmlSchemaName + ". refer other errors");
+                        LookupResource.putErrMap("Error", "schema is " + xmlSchemaName + ". refer other errors");
                     } else {
-                        errMap.put("Error", "schema" + xmlSchemaName + " not found");
+                        LookupResource.putErrMap("Error", "schema" + xmlSchemaName + " not found");
                     }
-                    return LookupResource.getJson(errMap);
+                    return LookupResource.getErrMapJson();
                 }
             }
             return convert(xml, xsd);
         } catch (Exception e) {
             e.printStackTrace();
-            errMap.put("Exception", e.getClass().getName());
-            errMap.put("Message", e.getMessage());
-            return LookupResource.getJson(errMap);
+            LookupResource.putErrMap("Exception", e.getClass().getName());
+            LookupResource.putErrMap("Message", e.getMessage());
+            return LookupResource.getErrMapJson();
         }
     }
 
@@ -188,9 +200,9 @@ public class XML2JSONv2 extends ScalarFunction {
             return jsonMapper.writerWithDefaultPrettyPrinter().writeValueAsString(node);
         } catch (Exception e) {
             e.printStackTrace();
-            errMap.put("Exception", e.getClass().getName());
-            errMap.put("Message", e.getMessage());
-            return LookupResource.getJson(errMap);
+            LookupResource.putErrMap("Exception", e.getClass().getName());
+            LookupResource.putErrMap("Message", e.getMessage());
+            return LookupResource.getErrMapJson();
         }
     }
 
@@ -220,6 +232,12 @@ public class XML2JSONv2 extends ScalarFunction {
                 .uri(URI.create(this.endpoint + "venkyraghav/restartgo/refs/heads/main/" + resourceName))
                 .GET()
                 .build();
+            if (httpClient == null) {
+                httpClient = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(5))
+                    .followRedirects(HttpClient.Redirect.NORMAL)
+                    .build();
+            }
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             switch (response.statusCode()) {
                 case 200 -> {
@@ -233,16 +251,16 @@ public class XML2JSONv2 extends ScalarFunction {
                     return LookupResource.get(resourceName);
                 }
                 default -> {
-                    errMap.put("statusCode", String.valueOf(response.statusCode()));
-                    errMap.put("url", this.endpoint + "venkyraghav/restartgo/refs/heads/main/" + resourceName);
-                    LookupResource.putError(resourceName, LookupResource.getJson(errMap));
+                    LookupResource.putErrMap("statusCode", String.valueOf(response.statusCode()));
+                    LookupResource.putErrMap("url", this.endpoint + "venkyraghav/restartgo/refs/heads/main/" + resourceName);
+                    LookupResource.putError(resourceName, LookupResource.getErrMapJson());
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
-            errMap.put("Exception", e.getClass().getName());
-            errMap.put("Message", e.getMessage());
-            LookupResource.putError(resourceName, LookupResource.getJson(errMap));
+            LookupResource.putErrMap("Exception", e.getClass().getName());
+            LookupResource.putErrMap("Message", e.getMessage());
+            LookupResource.putError(resourceName, LookupResource.getErrMapJson());
         }
         return null;
     }
