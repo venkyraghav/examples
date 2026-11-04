@@ -1,0 +1,9 @@
+on:
+  push:
+    branches:
+      - 'feature/**'
+      - 'fix/**'
+      - 'chore/**'
+  pull_request:
+    branches:
+      - main
